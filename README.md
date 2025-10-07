@@ -1,6 +1,8 @@
 # Data visualization project
 
-Data Visualization project for the laksegate group. 
+Data Visualization project for the laksegate group.
+
+![dallas](/dallas%205.jpg)
 
 # Requirements for the project (from Brightspace)
 
