@@ -3,7 +3,7 @@ library(dplyr)
 library(stringr)
 library(tidyr)
 library(janitor)
-library(purrr)   
+library(purrr)
 
 # ---------- 1) Build dictionaries from UFM ----------
 ufm <- read_excel("DATA_UFM.xlsx") %>% clean_names()
@@ -12,7 +12,7 @@ titles_vec <- ufm$titel %>% unique() %>% str_squish() %>% discard(is.na)
 cities_vec <- ufm$instkommunetx %>% unique() %>% str_squish() %>% discard(is.na)
 
 # regex-safe alternation, longest-first (so we match "Erhvervsøkonomi, HA" before "Erhvervsøkonomi")
-rx_alt <- function(x){
+rx_alt <- function(x) {
   x <- x[order(nchar(x), decreasing = TRUE)]
   x <- str_replace_all(x, "([\\\\.^$|?*+()\\[\\]{}])", "\\\\\\1")
   paste(x, collapse = "|")
@@ -23,7 +23,7 @@ cities_alt <- rx_alt(cities_vec)
 # ---------- 2) Helpers for normalization ----------
 normalize_str  <- function(x) str_to_lower(str_squish(x))
 
-normalize_city <- function(x){
+normalize_city <- function(x) {
   x <- normalize_str(x)
   # København variants (Ø/N/V/S/K/NV/SV, etc.) -> "københavn"
   x <- ifelse(str_detect(x, "^københavn\\b"), "københavn", x)
