@@ -11,7 +11,8 @@ ufm <- read_excel("DATA_UFM.xlsx") %>% clean_names()
 titles_vec <- ufm$titel %>% unique() %>% str_squish() %>% discard(is.na)
 cities_vec <- ufm$instkommunetx %>% unique() %>% str_squish() %>% discard(is.na)
 
-# regex-safe alternation, longest-first (so we match "Erhvervsøkonomi, HA" before "Erhvervsøkonomi")
+# regex-safe alternation, longest-first (so we match "Erhvervsøkonomi, HA"
+# before "Erhvervsøkonomi")
 rx_alt <- function(x) {
   x <- x[order(nchar(x), decreasing = TRUE)]
   x <- str_replace_all(x, "([\\\\.^$|?*+()\\[\\]{}])", "\\\\\\1")
