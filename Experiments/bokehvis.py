@@ -2,6 +2,11 @@
 
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, show
+from bokeh.models import TextInput
+from bokeh.layouts import layout
+from bokeh.io import curdoc
+
+
 
 fruits = ["Apples", "Pears", "Nectarines", "Plums", "Grapes", "Strawberries"]
 years = ["2015", "2016", "2017"]
@@ -32,15 +37,22 @@ p.outline_line_color = None
 p.legend.location = "top_left"
 p.legend.orientation = "horizontal"
 
+textinput = TextInput(value="Type here", title="Label:")
+
+layout = layout([textinput], [p])
+
+# show(layout)
 # show(p)
 
 # set up the ui for the server
-from bokeh.io import curdoc
-curdoc().add_root(p)
+curdoc().add_root(layout)
 curdoc().title = "Fruit Counts"
+
+
 # run with: bokeh serve --show bokehvis.py
-# then go to http://localhost:5006/bokehvis
-# to see the result
+
+
+# then go to http://localhost:5006/bokehvis to see the result
 # to stop the server, go to the terminal and hit Ctrl-C
 # to restart the server, hit the up arrow and Enter
 
