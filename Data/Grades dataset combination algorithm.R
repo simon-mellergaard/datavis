@@ -89,5 +89,6 @@ dup_keys
 
 library(writexl)
 
-# Save the merged table to an Excel file in your working folder
+# Save the merged table to an Excel and csv file in your working folder
 write_xlsx(DATA_UFM_combined, "DATA_UFM_combined.xlsx")
+write.csv(DATA_UFM_combined, "DATA_UFM_combined.csv", row.names = FALSE)
