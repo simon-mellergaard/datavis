@@ -2,6 +2,8 @@
 
 Data Visualization project for the laksegate group.
 
+Docs document for ideas: https://docs.google.com/document/d/1nLFQZClVa5o1IPiKs25YTJuLtGvh8mCOty0B2ZP7wyk/edit?tab=t.0 
+
 ![dallas](/dallas%205.jpg)
 
 # Requirements for the project (from Brightspace)
