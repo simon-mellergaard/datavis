@@ -111,8 +111,6 @@ format_factor <- function(column) {
 }
 
 # Format all columns
-
-
 numeric_cols <- read.table("numeric.txt", header = FALSE)[, 1]        # Replace with list of all numeric column names
 
 # Get all instances that contain 'pct' in their names of numeric_cols
@@ -128,6 +126,9 @@ for (col_name in names(DATA_UFM_combined)) {
   }
 }
 
+# Remove duplicate rows based on column 'udbud_id' and 'artikel_id'
+DATA_UFM_combined <- DATA_UFM_combined %>%
+  distinct(udbud_id, artikel_id, .keep_all = TRUE)
 
 
 # Save the merged table to an Excel and csv file in your working folder
