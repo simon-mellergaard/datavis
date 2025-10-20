@@ -89,5 +89,44 @@ dup_keys
 
 library(writexl)
 
-# Save the merged table to an Excel file in your working folder
+# ----------- 6) Convert to correct data types ----------
+str(DATA_UFM_combined)
+
+# Remove the '.' in the DATA_UFM_combined$maanedloen_10aar column and convert to numeric
+
+# Function to format each column in the dataset
+format_numeric <- function(column) {
+  column <- gsub("\\.", "", column)  # Remove dots
+  column <- gsub(",", ".", column)   # Replace comma with dot
+  as.numeric(column)                 # Convert to numeric
+}
+# Format percentage columns
+format_percentage <- function(column) {
+  column <- gsub(",", ".", column)  # Replace comma with dot
+  as.numeric(column) / 100          # Convert to numeric and divide by 100
+}
+# Format columns to be factors
+format_factor <- function(column) {
+  as.factor(column)                 # Convert to factor
+}
+
+# Format all columns
+numeric_cols <- ""        # Replace with list of all numeric column names
+percentage_cols <- ""     # Replace with list of all percentage column names
+factor_cols <- ""         # Replace with list of all factor column names
+
+for (col_name in names(DATA_UFM_combined)) {
+  if (col_name %in% numeric_cols) {
+    DATA_UFM_combined[[col_name]] <- format_numeric(DATA_UFM_combined[[col_name]])
+  } else if (col_name %in% percentage_cols) {
+    DATA_UFM_combined[[col_name]] <- format_percentage(DATA_UFM_combined[[col_name]])
+  } else if (col_name %in% factor_cols) {
+    DATA_UFM_combined[[col_name]] <- format_factor(DATA_UFM_combined[[col_name]])
+  }
+}
+
+
+
+# Save the merged table to an Excel and csv file in your working folder
 write_xlsx(DATA_UFM_combined, "DATA_UFM_combined.xlsx")
+write.csv(DATA_UFM_combined, "DATA_UFM_combined.csv", row.names = FALSE)
