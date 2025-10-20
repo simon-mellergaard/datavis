@@ -111,16 +111,19 @@ format_factor <- function(column) {
 }
 
 # Format all columns
-numeric_cols <- ""        # Replace with list of all numeric column names
-percentage_cols <- ""     # Replace with list of all percentage column names
-factor_cols <- ""         # Replace with list of all factor column names
+
+
+numeric_cols <- read.table("numeric.txt", header = FALSE)[, 1]        # Replace with list of all numeric column names
+
+# Get all instances that contain 'pct' in their names of numeric_cols
+percentage_cols <- numeric_cols[grep("pct", numeric_cols)]
 
 for (col_name in names(DATA_UFM_combined)) {
-  if (col_name %in% numeric_cols) {
-    DATA_UFM_combined[[col_name]] <- format_numeric(DATA_UFM_combined[[col_name]])
-  } else if (col_name %in% percentage_cols) {
+  if (col_name %in% percentage_cols) {
     DATA_UFM_combined[[col_name]] <- format_percentage(DATA_UFM_combined[[col_name]])
-  } else if (col_name %in% factor_cols) {
+  } else if (col_name %in% numeric_cols) {
+    DATA_UFM_combined[[col_name]] <- format_numeric(DATA_UFM_combined[[col_name]])
+  } else {
     DATA_UFM_combined[[col_name]] <- format_factor(DATA_UFM_combined[[col_name]])
   }
 }
