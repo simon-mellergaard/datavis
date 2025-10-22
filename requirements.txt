@@ -1,4 +1,5 @@
-bokeh==3.8.0
+bokeh==3.7.0 #Updated version for compatibility
+panel==1.8.2       # Required for interactive dashboard in VS Code/Jupyter
 pandas==2.3.3
 ipykernel==6.30.1
 matplotlib==3.10.7
