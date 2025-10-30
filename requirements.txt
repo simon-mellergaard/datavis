@@ -6,3 +6,5 @@ matplotlib==3.10.7
 seaborn==0.13.2
 openpyxl==3.1.5
 altair==5.5.0       # If using vega-altair
+plotly==5.24.1     # Interactive charts, needed for dendrogram
+dash==2.18.2        # Web framework for interactive drill-down
