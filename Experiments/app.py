@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from dash import Dash, dcc, html, Input, Output
 
 # ---------- Import data ----------
-df_raw = pd.read_excel('../Data/DATA_UFM_combined.xlsx', header=0)
+df_raw = pd.read_excel('../Data/DATA_UFM_combined_TEST_AREA_filled.xlsx', header=0)
 
 # ---------- Columns to keep ----------
 cols = [
