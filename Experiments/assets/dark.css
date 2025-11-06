@@ -1,0 +1,11 @@
+/* Dash Dropdown dark theme */
+.Select-control,
+.Select-menu-outer,
+.Select-menu {
+  background-color: #1f2630 !important;
+  color: #e5e7eb !important;
+  border-color: #2a2f3a !important;
+}
+.Select-value-label, .Select-placeholder { color: #e5e7eb !important; }
+.Select-option { background-color: #1f2630 !important; color: #e5e7eb !important; }
+.Select-option.is-focused, .Select-option:hover { background-color: #2a3340 !important; }
