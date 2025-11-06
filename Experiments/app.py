@@ -64,7 +64,7 @@ treemap = px.treemap(
     path=['educational_category', 'cluster_label', 'titel'],
     values='maanedloen_10aar',
     color='socialtmiljo_likert',
-    color_continuous_scale=["#08306B", "#FFFFFF", "#DEEBF7"],
+    color_continuous_scale=px.colors.sequential.Blues_r,
 )
 treemap.update_layout(
     template="plotly_dark",
@@ -73,6 +73,17 @@ treemap.update_layout(
     font_color=FONT_COL,
     margin=dict(t=50, l=30, r=50, b=20),
 )
+
+treemap.update_coloraxes(
+    cmin=df_tm['socialtmiljo_likert'].min(),
+    cmax=df_tm['socialtmiljo_likert'].max(),
+    colorbar=dict(
+        title="Socialt miljø",
+        tickfont=dict(color=FONT_COL),
+        titlefont=dict(color=FONT_COL)
+    )
+)
+
 # make the colorbar font visible on dark
 treemap.update_traces(root_color="#1c1f26",
                       marker_colorbar=dict(tickfont=dict(color=FONT_COL),
