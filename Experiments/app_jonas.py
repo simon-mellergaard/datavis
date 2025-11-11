@@ -5,7 +5,7 @@ from dash import Dash, dcc, html, Input, Output
 import numpy as np
 
 # ---------- Import data ----------
-df_raw = pd.read_excel('../Data/DATA_UFM_combined_TEST_AREA_filled.xlsx', header=0)
+df_raw = pd.read_excel('../Data/DATA_UFM_combined_TEST_AREA_filled_V2.xlsx', header=0)
 
 # ---------- Columns to keep ----------
 cols = [
@@ -85,11 +85,22 @@ if 'kandidat_titler' not in df.columns or 'kandidat_refs' not in df.columns:
     df['kandidat_titler'] = kand_titles
     df['kandidat_refs'] = kand_refs
 
-# ---------- CLEAN for treemap ----------
-df_tm = df.dropna(subset=[
-    'educational_category', 'cluster_label', 'titel',
-    'maanedloen_10aar', 'socialtmiljo_likert'
-]).copy()
+# ---------- CLEAN for treemap (national + optagne) ----------
+def to_num(s: pd.Series) -> pd.Series:
+    # Locale-safe numeric (e.g., "1.234", "1,234" -> 1234) and NaN-safe
+    return pd.to_numeric(s.astype(str).str.replace(',', '.', regex=False), errors='coerce')
+
+# Keep only national rows
+df_nat = df.copy()
+df_nat = df_nat[df_nat['udbud_id'] == 999999].copy()
+
+# Parse optagne to numeric and filter to rows that have it
+df_nat['optagne_num'] = to_num(df_nat['optagne'])
+df_tm = df_nat.dropna(subset=['educational_category', 'cluster_label', 'titel', 'optagne_num']).copy()
+
+# Optional: drop non-positive counts
+df_tm = df_tm[df_tm['optagne_num'] > 0]
+
 
 # ---------- Radar (Likert; raw values) ----------
 radar_vars = [
@@ -118,18 +129,18 @@ CUSTOM_CARD = {"padding":"8px","backgroundColor":"#11151b","border":"1px solid #
 treemap = px.treemap(
     df_tm,
     path=['educational_category', 'cluster_label', 'titel'],
-    values='maanedloen_10aar',
-    color='socialtmiljo_likert',
-    color_continuous_scale=px.colors.sequential.Blues_r,
+    values='optagne_num',               # <-- size by national optagne
+    color='optagne_num',                # <-- color by the same metric (can switch if you prefer)
+    color_continuous_scale=px.colors.sequential.Blues
 )
 treemap.update_layout(
-    template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-    font_color=FONT_COL, margin=dict(t=50, l=30, r=50, b=20),
+    template="plotly_dark",
+    paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+    margin=dict(t=50, l=30, r=50, b=20),
+    title="Optagne (nationalt) pr. uddannelse"
 )
 treemap.update_coloraxes(
-    cmin=df_tm['socialtmiljo_likert'].min(),
-    cmax=df_tm['socialtmiljo_likert'].max(),
-    colorbar=dict(title="Socialt miljø",
+    colorbar=dict(title="Optagne (nationalt)",
                   tickfont=dict(color=FONT_COL),
                   titlefont=dict(color=FONT_COL))
 )
@@ -359,7 +370,6 @@ MUNICIPALITY_COORDS = {
     "Esbjerg":   (55.4767,  8.4520),
     "Roskilde":  (55.6415, 12.0803),
     "Kolding":   (55.4904,  9.4721),
-    # Extend with more municipalities as needed
 }
 
 def _ensure_latlon_from_municipality(df_in: pd.DataFrame) -> pd.DataFrame:
@@ -474,6 +484,65 @@ def build_providers_map(providers_df):
     fig.update_traces(hovertemplate=hover_t, marker=dict(size=12))
     return fig
 
+# ---------- NEW: Sankey builder ----------
+def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
+    """
+    Build a left→right Sankey: bachelors (left) to kandidat (right).
+    'weight' determines link thickness. We keep top_k kandidat destinations.
+    """
+    if flow.empty:
+        fig = go.Figure()
+        fig.update_layout(template="plotly_dark",
+                          paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+        return fig
+
+    # keep only top_k kandidat-retninger for readability
+    agg = (flow.groupby('kandidat', as_index=False)['weight'].sum()
+                 .sort_values('weight', ascending=False))
+    keep_k = set(agg['kandidat'].head(top_k))
+    flow2 = flow[flow['kandidat'].isin(keep_k)].copy()
+    if flow2.empty:
+        flow2 = flow.copy()
+
+    # Nodes: left (bachelors) then right (kandidater)
+    bachelors = list(dict.fromkeys([b for b in selected_bachelors if b]))
+    kandidater = sorted(flow2['kandidat'].unique().tolist())
+    labels = bachelors + kandidater
+    idx = {lab:i for i, lab in enumerate(labels)}
+
+    sources = [idx[row['bachelor']] for _, row in flow2.iterrows()]
+    targets = [idx[row['kandidat']] for _, row in flow2.iterrows()]
+    values  = [row['weight'] for _, row in flow2.iterrows()]
+
+    node_colors_left  = px.colors.sample_colorscale(px.colors.sequential.Blues_r,
+                                                    [i/max(1, len(bachelors)-1) for i in range(len(bachelors))]) if bachelors else []
+    node_colors_right = px.colors.sample_colorscale(px.colors.sequential.Blues,
+                                                    [i/max(1, len(kandidater)-1) for i in range(len(kandidater))]) if kandidater else []
+    node_colors = node_colors_left + node_colors_right
+
+    custom = np.c_[flow2['ledighed_nyudd'], flow2['maanedloen_nyudd'], flow2['maanedloen_10aar']]
+    link_hover = ("<b>%{source.label}</b> → <b>%{target.label}</b><br>"
+                  "Vægt: %{value:.0f}"
+                  "<br>Ledighed (nyudd.): %{customdata[0]:.1f}%"
+                  "<br>Løn (nyudd.): %{customdata[1]:.0f}"
+                  "<br>Løn (10 år): %{customdata[2]:.0f}<extra></extra>")
+
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(label=labels,
+                  color=node_colors,
+                  pad=12, thickness=16,
+                  line=dict(color="#2a2f3a", width=1)),
+        link=dict(source=sources, target=targets, value=values,
+                  customdata=custom, hovertemplate=link_hover)
+    ))
+    fig.update_layout(
+        title="Flow chart: Bachelor → Kandidat (tykkelse = vægt)",
+        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+        margin=dict(t=50, l=10, r=20, b=20), height=480
+    )
+    return fig
+
 # ---------- Dash app ----------
 app = Dash(__name__)
 titles_options = sorted(df['titel'].dropna().unique())
@@ -514,7 +583,7 @@ app.layout = html.Div(
 
         html.Hr(style={"borderColor":"#2a2f3a"}),
 
-        # Multi-bachelor exploration (bar + heatmap)
+        # Multi-bachelor exploration (bar + SANKEY)
         html.Div("Udforsk kandidat-retninger (vælg flere bachelorer)",
                  style={"fontWeight":"600", "marginBottom":"6px"}),
         dcc.Dropdown(
@@ -527,7 +596,7 @@ app.layout = html.Div(
         html.Div([
             html.Div([ dcc.Graph(id="kandidat_bar", style={"height":"480px"}) ],
                      style={"flex":"1 1 520px", "minWidth":"420px"}),
-            html.Div([ dcc.Graph(id="kandidat_heatmap", style={"height":"480px"}) ],
+            html.Div([ dcc.Graph(id="kandidat_flow", style={"height":"480px"}) ],     # Sankey here
                      style={"flex":"1 1 520px", "minWidth":"420px"}),
         ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
 
@@ -616,17 +685,20 @@ def update_main(a, b, c):
 
     return radar_fig, msg, style, bar_afbrud, bar_ledighed, bar_loen_ny
 
+# --- UPDATED: Multi-bachelor callback -> bar + Sankey
 @app.callback(
-    [Output("kandidat_bar","figure"), Output("kandidat_heatmap","figure")],
+    [Output("kandidat_bar","figure"), Output("kandidat_flow","figure")],
     Input("bachelor_multi","value")
 )
 def update_multi_charts(selected):
+    empty = go.Figure()
+    empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+
     if not selected:
-        return go.Figure(), go.Figure()
+        return empty, empty
+
     flow = build_flow_df(selected)
     if flow.empty:
-        empty = go.Figure()
-        empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
         return empty, empty
 
     agg = (flow.groupby('kandidat', as_index=False)
@@ -647,22 +719,8 @@ def update_multi_charts(selected):
         margin=dict(t=50, l=10, r=20, b=40), yaxis=dict(automargin=True)
     )
 
-    top_k = 12
-    top_cands = agg['kandidat'].head(top_k).tolist()
-    hm_df = (flow[flow['kandidat'].isin(top_cands)]
-                .pivot_table(index='bachelor', columns='kandidat', values='weight', aggfunc='sum', fill_value=0)
-                .reindex(index=selected))
-    heatmap = go.Figure(go.Heatmap(
-        z=hm_df.values, x=hm_df.columns.tolist(), y=hm_df.index.tolist(),
-        colorscale=px.colors.sequential.Blues, colorbar=dict(title="Vægt"),
-        hovertemplate="Bachelor: %{y}<br>Kandidat: %{x}<br>Vægt: %{z}<extra></extra>"
-    ))
-    heatmap.update_layout(
-        title=f"Flow-matrix (top {top_k} kandidatretninger)",
-        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
-        margin=dict(t=50, l=60, r=20, b=60), xaxis=dict(tickangle=30)
-    )
-    return bar, heatmap
+    sankey = build_sankey(flow, selected, top_k=20)
+    return bar, sankey
 
 # --- Detail panel callback (provider-level, not national) ---
 @app.callback(
