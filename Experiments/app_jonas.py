@@ -86,21 +86,17 @@ if 'kandidat_titler' not in df.columns or 'kandidat_refs' not in df.columns:
     df['kandidat_refs'] = kand_refs
 
 # ---------- CLEAN for treemap (national + optagne) ----------
-def to_num(s: pd.Series) -> pd.Series:
-    # Locale-safe numeric (e.g., "1.234", "1,234" -> 1234) and NaN-safe
-    return pd.to_numeric(s.astype(str).str.replace(',', '.', regex=False), errors='coerce')
-
-# Keep only national rows
-df_nat = df.copy()
-df_nat = df_nat[df_nat['udbud_id'] == 999999].copy()
-
-# Parse optagne to numeric and filter to rows that have it
+df_nat = df[df['udbud_id'] == 999999].copy()
 df_nat['optagne_num'] = to_num(df_nat['optagne'])
-df_tm = df_nat.dropna(subset=['educational_category', 'cluster_label', 'titel', 'optagne_num']).copy()
 
-# Optional: drop non-positive counts
+# Only include rows with category/cluster/title and positive optagne
+df_tm = df_nat.dropna(subset=['educational_category', 'cluster_label', 'titel', 'optagne_num']).copy()
 df_tm = df_tm[df_tm['optagne_num'] > 0]
 
+# ---------- AVAILABLE TITLES (restrict dropdowns to these) ----------
+AVAILABLE_TITLES = sorted(df_tm['titel'].dropna().astype(str).unique())
+AVAILABLE_OPTIONS = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
+AVAILABLE_SET = set(AVAILABLE_TITLES)
 
 # ---------- Radar (Likert; raw values) ----------
 radar_vars = [
@@ -129,8 +125,8 @@ CUSTOM_CARD = {"padding":"8px","backgroundColor":"#11151b","border":"1px solid #
 treemap = px.treemap(
     df_tm,
     path=['educational_category', 'cluster_label', 'titel'],
-    values='optagne_num',               # <-- size by national optagne
-    color='optagne_num',                # <-- color by the same metric (can switch if you prefer)
+    values='optagne_num',               # size by national optagne
+    color='optagne_num',                # color by same metric
     color_continuous_scale=px.colors.sequential.Blues
 )
 treemap.update_layout(
@@ -199,10 +195,11 @@ df_raw_lu['artikel_id'] = df_raw_lu['artikel_id'].astype(str)
 df_raw_lu['udbud_id_str'] = df_raw_lu['udbud_id'].apply(_norm_udbud)
 raw_idx = df_raw_lu.set_index(['artikel_id','udbud_id_str'])
 
-bachelor_titles_multi = sorted(df.loc[
-    (df['displaydocclass']=='Bacheloruddannelse') & (df['udbud_id']==999999),
-    'titel'
-].dropna().unique())
+# restrict multi-bachelor options to available titles + bachelor + national
+bachelor_titles_multi = sorted(
+    set(df.loc[(df['displaydocclass']=='Bacheloruddannelse') & (df['udbud_id']==999999), 'titel']
+        .dropna().astype(str).unique()) & AVAILABLE_SET
+)
 
 def build_flow_df(selected_bachelors):
     if not selected_bachelors:
@@ -277,7 +274,6 @@ def build_detail_table(df_all, edu_title):
     if providers.empty:
         providers = df_all[df_all['titel'].astype(str)==str(edu_title)].copy()
 
-    # First-job titles (most common)
     strings = { lbl: mode_str(providers.get(col, pd.Series(dtype=object))) for col, lbl in [
         ('foerstejob1tx','Første job #1'),
         ('foerstejob2tx','Første job #2'),
@@ -285,7 +281,6 @@ def build_detail_table(df_all, edu_title):
         ('foerstejob4tx','Første job #4'),
     ] }
 
-    # Groups p1..p5 (mean if numeric else mode)
     groups_out = {}
     for gname, cols in DETAIL_GROUPS.items():
         items = []
@@ -301,7 +296,6 @@ def build_detail_table(df_all, edu_title):
         if items:
             groups_out[gname] = items
 
-    # Numeric summaries (means)
     numeric = {}
     for col in DETAIL_NUMERIC:
         if col in providers.columns:
@@ -309,7 +303,6 @@ def build_detail_table(df_all, edu_title):
             if m is not None:
                 numeric[col] = m
 
-    # Build HTML table
     rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
     for k,v in numeric.items():
         label = "Kvote 1 kvotient" if k=="kvote_1_kvotient" else ("Standby (8)" if k=="standby_8" else k)
@@ -322,20 +315,18 @@ def build_detail_table(df_all, edu_title):
     for gname, items in groups_out.items():
         pretty = []
         for key,val in items:
-            pidx = key.split("_")[-1].upper()  # p1 -> P1
+            pidx = key.split("_")[-1].upper()
             if isinstance(val, (int,float)):
                 pretty.append(f"{pidx}: {val:.1f}")
             else:
                 pretty.append(f"{pidx}: {val}")
         rows.append(html.Tr([html.Th(gname), html.Td(html.Ul([html.Li(x) for x in pretty]))]))
 
-    # --- Kvote 1 pr. sted (robust to comma-decimals) ---
     if 'kvote_1_kvotient' in providers.columns:
         tmp = providers.copy()
         tmp['kvote_num'] = to_num(tmp['kvote_1_kvotient'])
         tmp = tmp[tmp['kvote_num'].notna()]
 
-        # If multiple rows per provider/location, keep the highest kvote shown (or change rule)
         grp_keys = [c for c in ['hovedinsttx', 'instkommunetx'] if c in tmp.columns]
         if grp_keys:
             tmp = (tmp.sort_values('kvote_num', ascending=False)
@@ -354,7 +345,6 @@ def build_detail_table(df_all, edu_title):
 
     table = html.Table([html.Tbody(rows)], style={"width":"100%","borderCollapse":"collapse"})
 
-    # Provider list for mapping (keep all rows; do not over-deduplicate)
     keep_cols = ['hovedinsttx','instkommunetx','instregiontx','udbud_id','artikel_id','titel',
                  'kvote_1_kvotient','standby_8','inst_lat','inst_lon']
     keep_cols = [c for c in keep_cols if c in providers.columns]
@@ -373,9 +363,6 @@ MUNICIPALITY_COORDS = {
 }
 
 def _ensure_latlon_from_municipality(df_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    If inst_lat/inst_lon are missing, fill from MUNICIPALITY_COORDS using instkommunetx.
-    """
     df = df_in.copy()
     if 'inst_lat' not in df.columns: df['inst_lat'] = np.nan
     if 'inst_lon' not in df.columns: df['inst_lon'] = np.nan
@@ -391,11 +378,6 @@ def _ensure_latlon_from_municipality(df_in: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def build_providers_map(providers_df):
-    """
-    Plot providers on a map. If lat/lon missing, backfill from municipality mapping.
-    Zoomed to Denmark by default, with slight auto-adjust from spread.
-    Includes Kvote 1 / Standby in hover with locale-safe parsing.
-    """
     if providers_df.empty:
         fig = go.Figure()
         fig.update_layout(template="plotly_dark",
@@ -403,16 +385,13 @@ def build_providers_map(providers_df):
                           margin=dict(t=0,l=0,r=0,b=0))
         return fig
 
-    # Backfill coords
     providers_geo = _ensure_latlon_from_municipality(providers_df)
 
-    # Parse numbers for hover
     if 'kvote_1_kvotient' in providers_geo.columns:
         providers_geo['kvote_num'] = to_num(providers_geo['kvote_1_kvotient'])
     if 'standby_8' in providers_geo.columns:
         providers_geo['standby_num'] = to_num(providers_geo['standby_8'])
 
-    # Keep rows that have coordinates
     providers_geo = providers_geo.dropna(subset=['inst_lat','inst_lon'])
     if providers_geo.empty:
         fig = go.Figure()
@@ -426,7 +405,6 @@ def build_providers_map(providers_df):
                           margin=dict(t=0,l=0,r=0,b=0))
         return fig
 
-    # Hover fields
     hover_cols = [c for c in ['instkommunetx','instregiontx','titel'] if c in providers_geo.columns]
     if 'kvote_num' in providers_geo.columns:
         hover_cols.append('kvote_num')
@@ -441,7 +419,6 @@ def build_providers_map(providers_df):
         zoom=6, height=520
     )
 
-    # Denmark-friendly center & auto tweak
     lats = providers_geo['inst_lat'].astype(float)
     lons = providers_geo['inst_lon'].astype(float)
     lat_span = float(lats.max() - lats.min()) if len(lats) else 0.0
@@ -464,7 +441,6 @@ def build_providers_map(providers_df):
         margin=dict(t=0,l=0,r=0,b=0)
     )
 
-    # Friendly hover
     has_k = 'kvote_num' in providers_geo.columns
     has_s = 'standby_num' in providers_geo.columns
     hover_t = "<b>%{hovertext}</b><br>"
@@ -486,17 +462,12 @@ def build_providers_map(providers_df):
 
 # ---------- NEW: Sankey builder ----------
 def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
-    """
-    Build a left→right Sankey: bachelors (left) to kandidat (right).
-    'weight' determines link thickness. We keep top_k kandidat destinations.
-    """
     if flow.empty:
         fig = go.Figure()
         fig.update_layout(template="plotly_dark",
                           paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
         return fig
 
-    # keep only top_k kandidat-retninger for readability
     agg = (flow.groupby('kandidat', as_index=False)['weight'].sum()
                  .sort_values('weight', ascending=False))
     keep_k = set(agg['kandidat'].head(top_k))
@@ -504,7 +475,6 @@ def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
     if flow2.empty:
         flow2 = flow.copy()
 
-    # Nodes: left (bachelors) then right (kandidater)
     bachelors = list(dict.fromkeys([b for b in selected_bachelors if b]))
     kandidater = sorted(flow2['kandidat'].unique().tolist())
     labels = bachelors + kandidater
@@ -529,9 +499,7 @@ def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
 
     fig = go.Figure(go.Sankey(
         arrangement="snap",
-        node=dict(label=labels,
-                  color=node_colors,
-                  pad=12, thickness=16,
+        node=dict(label=labels, color=node_colors, pad=12, thickness=16,
                   line=dict(color="#2a2f3a", width=1)),
         link=dict(source=sources, target=targets, value=values,
                   customdata=custom, hovertemplate=link_hover)
@@ -545,7 +513,9 @@ def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
 
 # ---------- Dash app ----------
 app = Dash(__name__)
-titles_options = sorted(df['titel'].dropna().unique())
+
+# Use AVAILABLE options everywhere
+titles_options = AVAILABLE_OPTIONS
 
 app.layout = html.Div(
     style={"padding":"12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight":"100vh"},
@@ -596,7 +566,7 @@ app.layout = html.Div(
         html.Div([
             html.Div([ dcc.Graph(id="kandidat_bar", style={"height":"480px"}) ],
                      style={"flex":"1 1 520px", "minWidth":"420px"}),
-            html.Div([ dcc.Graph(id="kandidat_flow", style={"height":"480px"}) ],     # Sankey here
+            html.Div([ dcc.Graph(id="kandidat_flow", style={"height":"480px"}) ],
                      style={"flex":"1 1 520px", "minWidth":"420px"}),
         ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
 
@@ -606,7 +576,7 @@ app.layout = html.Div(
                  style={"fontWeight":"600", "marginBottom":"6px"}),
 
         dcc.Dropdown(
-            options=[{"label":t, "value":t} for t in sorted(df_raw['titel'].dropna().astype(str).unique())],
+            options=AVAILABLE_OPTIONS,  # restrict to available titles
             id="detail_select",
             placeholder="Vælg uddannelse (ikke nationalt niveau)",
             clearable=True,
@@ -624,7 +594,8 @@ app.layout = html.Div(
 
 # ---------- Builders ----------
 def build_simple_bar(metric, titles, title_txt, tickprefix=""):
-    sel = df[df['titel'].isin(titles)]
+    sel_titles = [t for t in titles if t in AVAILABLE_SET]  # guard
+    sel = df[df['titel'].isin(sel_titles)]
     fig = go.Figure()
     if not sel.empty and metric in sel.columns:
         colors = bar_colors(len(sel))
@@ -655,10 +626,10 @@ def build_simple_bar(metric, titles, title_txt, tickprefix=""):
     Input("edu3", "value"),
 )
 def update_main(a, b, c):
-    selected = [x for x in [a, b, c] if x]
+    # ensure only available selections are used
+    selected = [x for x in [a, b, c] if x in AVAILABLE_SET]
     radar_fig = build_radar_raw(selected) if selected else build_radar_raw([])
 
-    # Notice for university bachelor
     notice_titles = []
     for t in selected:
         row = df[df['titel']==t]
@@ -685,7 +656,7 @@ def update_main(a, b, c):
 
     return radar_fig, msg, style, bar_afbrud, bar_ledighed, bar_loen_ny
 
-# --- UPDATED: Multi-bachelor callback -> bar + Sankey
+# --- Multi-bachelor callback -> bar + Sankey
 @app.callback(
     [Output("kandidat_bar","figure"), Output("kandidat_flow","figure")],
     Input("bachelor_multi","value")
@@ -694,6 +665,10 @@ def update_multi_charts(selected):
     empty = go.Figure()
     empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
 
+    # guard (should already be restricted by dropdown)
+    if not selected:
+        return empty, empty
+    selected = [s for s in selected if s in bachelor_titles_multi]
     if not selected:
         return empty, empty
 
@@ -728,7 +703,7 @@ def update_multi_charts(selected):
     Input("detail_select","value")
 )
 def update_detail_panel(edu_title):
-    if not edu_title:
+    if not edu_title or edu_title not in AVAILABLE_SET:
         empty_table = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color":"#9aa4b2"})
         empty_fig = go.Figure()
         empty_fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG)
