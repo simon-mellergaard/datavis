@@ -49,12 +49,10 @@ df_prov = data[data['udbud_id'] != 999999].copy()
 df_prov['titel'] = df_prov['titel'].astype(str).str.strip()
 df_prov = df_prov.merge(mapping, on='titel', how='left')
 
-# numeric helpers for metrics
 df_prov['optagne_num']        = to_num(df_prov.get('optagne'))
 df_prov['maanedloen_nyudd_n'] = to_num(df_prov.get('maanedloen_nyudd'))
 df_prov['ledighed_nyudd_n']   = to_num(df_prov.get('ledighed_nyudd'))
 
-# Available cities (municipalities) and metric choices
 CITY_LIST    = sorted(df_prov['instkommunetx'].dropna().astype(str).unique())
 CITY_OPTIONS = [{'label': 'Alle kommuner', 'value': '__ALL__'}] + \
                [{'label': c, 'value': c} for c in CITY_LIST]
@@ -109,7 +107,6 @@ AVAILABLE_TITLES  = sorted(available_titles_all)
 AVAILABLE_OPTIONS = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
 AVAILABLE_SET     = set(AVAILABLE_TITLES)
 
-# restrict multi-bachelor options to available titles + bachelor + national
 bachelor_titles_multi = sorted(
     set(df.loc[(df['displaydocclass']=='Bacheloruddannelse') & (df['udbud_id']==999999), 'titel']
         .dropna().astype(str).unique()) & AVAILABLE_SET
@@ -142,6 +139,27 @@ if rad_min >= rad_max: rad_min, rad_max = 1.0, 5.0
 def bar_colors(n):
     t = [i/(n-1) if n>1 else 0 for i in range(n)]
     return px.colors.sample_colorscale(px.colors.sequential.Blues_r, t)
+
+# ---------- KPI bar helper (FIX ADDED) ----------
+def build_simple_bar(metric, titles, title_txt, tickprefix=""):
+    sel_titles = [t for t in titles if t in AVAILABLE_SET]
+    sel = df[df['titel'].isin(sel_titles)]
+    fig = go.Figure()
+    if not sel.empty and metric in sel.columns:
+        colors = bar_colors(len(sel))
+        fig.add_trace(go.Bar(
+            x=sel['titel'], y=sel[metric],
+            marker=dict(color=colors),
+            hovertemplate="<b>%{x}</b><br>" + title_txt + ": %{y:.2f}<extra></extra>"
+        ))
+    fig.update_layout(
+        title=title_txt,
+        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+        margin=dict(t=40, l=40, r=20, b=70),
+        xaxis=dict(tickangle=20),
+        yaxis=dict(tickprefix=tickprefix)
+    )
+    return fig
 
 # ---------- Radar builder ----------
 def build_radar_raw(titles):
@@ -341,14 +359,6 @@ def build_detail_table(df_all, edu_title):
         rows.append(html.Tr([html.Th("Første job (typisk)"),
                              html.Td(", ".join([s for s in strings.values() if s]))]))
 
-    for gname, items in groups_out.items():
-        pretty = []
-        for key,val in items:
-            pidx = key.split("_")[-1].upper()
-            if isinstance(val, (int,float)): pretty.append(f"{pidx}: {val:.1f}")
-            else: pretty.append(f"{pidx}: {val}")
-        rows.append(html.Tr([html.Th(gname), html.Td(html.Ul([html.Li(x) for x in pretty]))]))
-
     if 'kvote_1_kvotient' in providers.columns:
         tmp = providers.copy()
         tmp['kvote_num'] = to_num(tmp['kvote_1_kvotient'])
@@ -477,7 +487,7 @@ def build_providers_map(providers_df):
     fig.update_traces(hovertemplate=hover_t, marker=dict(size=12))
     return fig
 
-# ---------- Treemap builder (CITY + METRIC) ----------
+# ---------- Treemap builder (CITY + METRIC)  [FIXED AGG] ----------
 def build_city_treemap(city_value, metric_key):
     if metric_key not in SIZE_METRICS:
         metric_key = 'optagne'
@@ -501,16 +511,22 @@ def build_city_treemap(city_value, metric_key):
                            x=0.5,y=0.5,xref="paper",yref="paper")
         return fig
 
-    # aggregate by title within taxonomy using sum or mean
-    aggfunc = {'sum': np.nansum, 'mean': np.nanmean}[how]
-    grouped = (df_sel
-               .groupby(['educational_category','cluster_label','titel'], as_index=False)
-               .agg(size=(metric_col, aggfunc)))
+    # aggregate by title within taxonomy using sum or mean (no FutureWarning)
+    if how == 'sum':
+        grouped = (df_sel
+                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .sum()
+                   .rename(columns={metric_col: 'size'}))
+    else:  # 'mean'
+        grouped = (df_sel
+                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .mean()
+                   .rename(columns={metric_col: 'size'}))
 
     grouped = grouped[np.isfinite(grouped['size'])]
     grouped = grouped[grouped['size'] > 0]
 
-    title_txt = f"{SIZE_METRICS[metric_key][2]} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
+    title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
 
     fig = px.treemap(
         grouped,
@@ -523,7 +539,7 @@ def build_city_treemap(city_value, metric_key):
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
         margin=dict(t=50,l=30,r=50,b=20), title=title_txt
     )
-    fig.update_coloraxes(colorbar=dict(title=SIZE_METRICS[metric_key][2],
+    fig.update_coloraxes(colorbar=dict(title=metric_label,
                                        tickfont=dict(color=FONT_COL),
                                        titlefont=dict(color=FONT_COL)))
     fig.update_traces(root_color="#1c1f26",
@@ -605,7 +621,7 @@ app.layout = html.Div(
         html.Div("Detaljer for valgt uddannelse (udbydere + info)",
                  style={"fontWeight":"600","marginBottom":"6px"}),
         dcc.Dropdown(
-            options=AVAILABLE_OPTIONS,  # restrict to available titles
+            options=AVAILABLE_OPTIONS,
             id="detail_select",
             placeholder="Vælg uddannelse (ikke nationalt niveau)",
             clearable=True,
