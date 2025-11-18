@@ -5,7 +5,7 @@ from dash import Dash, dcc, html, Input, Output
 import numpy as np
 
 # ---------- Import data ----------
-df_raw = pd.read_excel('../Data/DATA_UFM_combined_TEST_AREA_filled.xlsx', header=0)
+df_raw = pd.read_excel('../Data/DATA_UFM_combined_TEST_AREA_filled_V2.xlsx', header=0)
 
 # ---------- Columns to keep ----------
 cols = [
@@ -23,28 +23,48 @@ cols = [
     'kompetencerudd_p1','kompetencerudd_p2','kompetencerudd_p3','kompetencerudd_p4','kompetencerudd_p5',
     'ledighed_nyudd','maanedloen_nyudd','maanedloen_10aar',
     'hyppigsteid1','hyppigsteid2','hyppigsteid3','kandidat_titler','kandidat_refs','cluster_label',
-    # optional map coords
     'inst_lat','inst_lon'
 ]
 cols = [c for c in cols if c in df_raw.columns]
 data = df_raw[cols].copy()
 
-# ---------- Filter national-level (used by main views) ----------
-data_whole_edu = data[data['udbud_id'] == 999999].copy()
-data_whole_edu['titel'] = data_whole_edu['titel'].astype(str).str.strip()
-
 # ---------- Load cluster mapping ----------
 mapping = pd.read_excel("../Data/education_cluster_mapping.xlsx")
 mapping['titel'] = mapping['titel'].astype(str).str.strip()
-data_whole_edu = data_whole_edu.merge(mapping, on='titel', how='left')
-data_whole_edu = data_whole_edu.drop_duplicates(subset=['titel'])
 
-# ---------- Base DF (national) ----------
+# ---------- NATIONAL base (used by radar/bars/sankey) ----------
+data_whole_edu = data[data['udbud_id'] == 999999].copy()
+data_whole_edu['titel'] = data_whole_edu['titel'].astype(str).str.strip()
+data_whole_edu = data_whole_edu.merge(mapping, on='titel', how='left').drop_duplicates(subset=['titel'])
+
 df = data_whole_edu.copy()
 df = df.dropna(subset=['titel'])
 df['titel'] = df['titel'].astype(str).str.strip()
 
-# ---------- Helpers ----------
+# ---------- PROVIDER-LEVEL base for CITY treemap ----------
+def to_num(s: pd.Series) -> pd.Series:
+    return pd.to_numeric(s.astype(str).str.replace(',', '.', regex=False), errors='coerce')
+
+df_prov = data[data['udbud_id'] != 999999].copy()
+df_prov['titel'] = df_prov['titel'].astype(str).str.strip()
+df_prov = df_prov.merge(mapping, on='titel', how='left')
+
+df_prov['optagne_num']        = to_num(df_prov.get('optagne'))
+df_prov['maanedloen_nyudd_n'] = to_num(df_prov.get('maanedloen_nyudd'))
+df_prov['ledighed_nyudd_n']   = to_num(df_prov.get('ledighed_nyudd'))
+
+CITY_LIST    = sorted(df_prov['instkommunetx'].dropna().astype(str).unique())
+CITY_OPTIONS = [{'label': 'Alle kommuner', 'value': '__ALL__'}] + \
+               [{'label': c, 'value': c} for c in CITY_LIST]
+
+SIZE_METRICS = {
+    'optagne': ('optagne_num', 'sum', 'Optagne (sum)'),
+    'maanedloen_nyudd': ('maanedloen_nyudd_n', 'mean', 'Løn (nyudd.) (gennemsnit)'),
+    'ledighed_nyudd': ('ledighed_nyudd_n', 'mean', 'Ledighed (nyudd.) (gennemsnit)')
+}
+SIZE_OPTIONS = [{'label': v[2], 'value': k} for k, v in SIZE_METRICS.items()]
+
+# ---------- kandidat_* backfill if missing ----------
 def norm_udbud(x):
     try: return str(int(x))
     except Exception: return str(x)
@@ -57,11 +77,6 @@ def parse_ref(s):
         return (a.strip(), norm_udbud(u.strip()))
     return None
 
-def to_num(s: pd.Series) -> pd.Series:
-    """Locale-safe numeric: convert '8,75' -> 8.75; non-parsable -> NaN."""
-    return pd.to_numeric(s.astype(str).str.replace(',', '.', regex=False), errors='coerce')
-
-# ---------- If kandidat_* columns missing, derive them from hyppigsteid1/2/3 ----------
 if 'kandidat_titler' not in df.columns or 'kandidat_refs' not in df.columns:
     ref_src = df_raw.copy()
     ref_src['artikel_id'] = ref_src['artikel_id'].astype(str)
@@ -85,11 +100,23 @@ if 'kandidat_titler' not in df.columns or 'kandidat_refs' not in df.columns:
     df['kandidat_titler'] = kand_titles
     df['kandidat_refs'] = kand_refs
 
-# ---------- CLEAN for treemap ----------
-df_tm = df.dropna(subset=[
-    'educational_category', 'cluster_label', 'titel',
-    'maanedloen_10aar', 'socialtmiljo_likert'
-]).copy()
+# ---------- AVAILABLE TITLES for other selectors ----------
+available_titles_all = df_prov.dropna(subset=['educational_category','cluster_label','titel'])['titel'] \
+                           .dropna().astype(str).unique()
+AVAILABLE_TITLES  = sorted(available_titles_all)
+AVAILABLE_OPTIONS = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
+AVAILABLE_SET     = set(AVAILABLE_TITLES)
+
+bachelor_titles_multi = sorted(
+    set(df.loc[(df['displaydocclass']=='Bacheloruddannelse') & (df['udbud_id']==999999), 'titel']
+        .dropna().astype(str).unique()) & AVAILABLE_SET
+)
+
+# ---------- Theme ----------
+CUSTOM_BG = "#0f1115"
+PLOT_BG   = "#0f1115"
+FONT_COL  = "#e5e7eb"
+CUSTOM_CARD = {"padding":"8px","backgroundColor":"#11151b","border":"1px solid #2a2f3a","borderRadius":"8px"}
 
 # ---------- Radar (Likert; raw values) ----------
 radar_vars = [
@@ -108,37 +135,33 @@ rad_min = float(np.nanmax([1, np.nanmin(likert_values)]))
 rad_max = float(np.nanmin([5, np.nanmax(likert_values)]))
 if rad_min >= rad_max: rad_min, rad_max = 1.0, 5.0
 
-# ---------- Theme ----------
-CUSTOM_BG = "#0f1115"
-PLOT_BG   = "#0f1115"
-FONT_COL  = "#e5e7eb"
-CUSTOM_CARD = {"padding":"8px","backgroundColor":"#11151b","border":"1px solid #2a2f3a","borderRadius":"8px"}
+# ---------- Color helper ----------
+def bar_colors(n):
+    t = [i/(n-1) if n>1 else 0 for i in range(n)]
+    return px.colors.sample_colorscale(px.colors.sequential.Blues_r, t)
 
-# ---------- Treemap ----------
-treemap = px.treemap(
-    df_tm,
-    path=['educational_category', 'cluster_label', 'titel'],
-    values='maanedloen_10aar',
-    color='socialtmiljo_likert',
-    color_continuous_scale=px.colors.sequential.Blues_r,
-)
-treemap.update_layout(
-    template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-    font_color=FONT_COL, margin=dict(t=50, l=30, r=50, b=20),
-)
-treemap.update_coloraxes(
-    cmin=df_tm['socialtmiljo_likert'].min(),
-    cmax=df_tm['socialtmiljo_likert'].max(),
-    colorbar=dict(title="Socialt miljø",
-                  tickfont=dict(color=FONT_COL),
-                  titlefont=dict(color=FONT_COL))
-)
-treemap.update_traces(root_color="#1c1f26",
-                      marker_colorbar=dict(tickfont=dict(color=FONT_COL),
-                                           titlefont=dict(color=FONT_COL),
-                                           outlinecolor="#2a2f3a"))
+# ---------- KPI bar helper (FIX ADDED) ----------
+def build_simple_bar(metric, titles, title_txt, tickprefix=""):
+    sel_titles = [t for t in titles if t in AVAILABLE_SET]
+    sel = df[df['titel'].isin(sel_titles)]
+    fig = go.Figure()
+    if not sel.empty and metric in sel.columns:
+        colors = bar_colors(len(sel))
+        fig.add_trace(go.Bar(
+            x=sel['titel'], y=sel[metric],
+            marker=dict(color=colors),
+            hovertemplate="<b>%{x}</b><br>" + title_txt + ": %{y:.2f}<extra></extra>"
+        ))
+    fig.update_layout(
+        title=title_txt,
+        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+        margin=dict(t=40, l=40, r=20, b=70),
+        xaxis=dict(tickangle=20),
+        yaxis=dict(tickprefix=tickprefix)
+    )
+    return fig
 
-# ---------- Radar builder (raw Likert) ----------
+# ---------- Radar builder ----------
 def build_radar_raw(titles):
     fig = go.Figure()
     theta = [lbl for _, lbl in radar_vars]
@@ -170,7 +193,7 @@ def build_radar_raw(titles):
     )
     return fig
 
-# ---------- Multi-bachelor helpers ----------
+# ---------- Flow helpers ----------
 def _norm_udbud(x):
     try: return str(int(x))
     except Exception: return str(x)
@@ -187,11 +210,6 @@ df_raw_lu = df_raw.copy()
 df_raw_lu['artikel_id'] = df_raw_lu['artikel_id'].astype(str)
 df_raw_lu['udbud_id_str'] = df_raw_lu['udbud_id'].apply(_norm_udbud)
 raw_idx = df_raw_lu.set_index(['artikel_id','udbud_id_str'])
-
-bachelor_titles_multi = sorted(df.loc[
-    (df['displaydocclass']=='Bacheloruddannelse') & (df['udbud_id']==999999),
-    'titel'
-].dropna().unique())
 
 def build_flow_df(selected_bachelors):
     if not selected_bachelors:
@@ -238,12 +256,55 @@ def build_flow_df(selected_bachelors):
                        'maanedloen_10aar':'mean'}))
     return flow
 
-# ---------- Color helper: per-bar luminance within same hue ----------
-def bar_colors(n):
-    t = [i/(n-1) if n>1 else 0 for i in range(n)]
-    return px.colors.sample_colorscale(px.colors.sequential.Blues_r, t)
+def build_sankey(flow: pd.DataFrame, selected_bachelors, top_k=20):
+    if flow.empty:
+        fig = go.Figure()
+        fig.update_layout(template="plotly_dark",
+                          paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+        return fig
+    agg = (flow.groupby('kandidat', as_index=False)['weight'].sum()
+                 .sort_values('weight', ascending=False))
+    keep_k = set(agg['kandidat'].head(top_k))
+    flow2 = flow[flow['kandidat'].isin(keep_k)].copy()
+    if flow2.empty: flow2 = flow.copy()
 
-# ---------- Detail panel helpers (provider-level, NOT national) ----------
+    bachelors = list(dict.fromkeys([b for b in selected_bachelors if b]))
+    kandidater = sorted(flow2['kandidat'].unique().tolist())
+    labels = bachelors + kandidater
+    idx = {lab:i for i, lab in enumerate(labels)}
+
+    sources = [idx[row['bachelor']] for _, row in flow2.iterrows()]
+    targets = [idx[row['kandidat']] for _, row in flow2.iterrows()]
+    values  = [row['weight'] for _, row in flow2.iterrows()]
+
+    node_colors_left  = px.colors.sample_colorscale(px.colors.sequential.Blues_r,
+                                                    [i/max(1, len(bachelors)-1) for i in range(len(bachelors))]) if bachelors else []
+    node_colors_right = px.colors.sample_colorscale(px.colors.sequential.Blues,
+                                                    [i/max(1, len(kandidater)-1) for i in range(len(kandidater))]) if kandidater else []
+    node_colors = node_colors_left + node_colors_right
+
+    custom = np.c_[flow2['ledighed_nyudd'], flow2['maanedloen_nyudd'], flow2['maanedloen_10aar']]
+    link_hover = ("<b>%{source.label}</b> → <b>%{target.label}</b><br>"
+                  "Vægt: %{value:.0f}"
+                  "<br>Ledighed (nyudd.): %{customdata[0]:.1f}%"
+                  "<br>Løn (nyudd.): %{customdata[1]:.0f}"
+                  "<br>Løn (10 år): %{customdata[2]:.0f}<extra></extra>")
+
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(label=labels, color=node_colors, pad=12, thickness=16,
+                  line=dict(color="#2a2f3a", width=1)),
+        link=dict(source=sources, target=targets, value=values,
+                  customdata=custom, hovertemplate=link_hover)
+    ))
+    fig.update_layout(
+        title="Flow chart: Bachelor → Kandidat (tykkelse = vægt)",
+        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+        margin=dict(t=50, l=10, r=20, b=20), height=480
+    )
+    return fig
+
+# ---------- Detail panel helpers ----------
 DETAIL_GROUPS = {
     "Undervisningsform": ['undervisningsform_p1','undervisningsform_p2','undervisningsform_p3','undervisningsform_p4','undervisningsform_p5'],
     "Jobskabende": ['jobskabende_p1','jobskabende_p2','jobskabende_p3','jobskabende_p4','jobskabende_p5'],
@@ -256,17 +317,14 @@ def mode_str(s: pd.Series):
     return s.value_counts().idxmax() if not s.empty else ""
 
 def mean_fmt(s: pd.Series):
-    v = to_num(s)
-    v = v.dropna()
+    v = to_num(s); v = v.dropna()
     return float(v.mean()) if not v.empty else None
 
 def build_detail_table(df_all, edu_title):
-    # Provider-level rows (not national)
     providers = df_all[(df_all['titel'].astype(str)==str(edu_title)) & (df_all['udbud_id']!=999999)].copy()
     if providers.empty:
         providers = df_all[df_all['titel'].astype(str)==str(edu_title)].copy()
 
-    # First-job titles (most common)
     strings = { lbl: mode_str(providers.get(col, pd.Series(dtype=object))) for col, lbl in [
         ('foerstejob1tx','Første job #1'),
         ('foerstejob2tx','Første job #2'),
@@ -274,31 +332,24 @@ def build_detail_table(df_all, edu_title):
         ('foerstejob4tx','Første job #4'),
     ] }
 
-    # Groups p1..p5 (mean if numeric else mode)
     groups_out = {}
     for gname, cols in DETAIL_GROUPS.items():
         items = []
         for c in cols:
             if c in providers.columns:
                 m = mean_fmt(providers[c])
-                if m is not None:
-                    items.append((c, m))
+                if m is not None: items.append((c, m))
                 else:
                     ms = mode_str(providers[c])
-                    if ms:
-                        items.append((c, ms))
-        if items:
-            groups_out[gname] = items
+                    if ms: items.append((c, ms))
+        if items: groups_out[gname] = items
 
-    # Numeric summaries (means)
     numeric = {}
     for col in DETAIL_NUMERIC:
         if col in providers.columns:
             m = mean_fmt(providers[col])
-            if m is not None:
-                numeric[col] = m
+            if m is not None: numeric[col] = m
 
-    # Build HTML table
     rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
     for k,v in numeric.items():
         label = "Kvote 1 kvotient" if k=="kvote_1_kvotient" else ("Standby (8)" if k=="standby_8" else k)
@@ -308,23 +359,11 @@ def build_detail_table(df_all, edu_title):
         rows.append(html.Tr([html.Th("Første job (typisk)"),
                              html.Td(", ".join([s for s in strings.values() if s]))]))
 
-    for gname, items in groups_out.items():
-        pretty = []
-        for key,val in items:
-            pidx = key.split("_")[-1].upper()  # p1 -> P1
-            if isinstance(val, (int,float)):
-                pretty.append(f"{pidx}: {val:.1f}")
-            else:
-                pretty.append(f"{pidx}: {val}")
-        rows.append(html.Tr([html.Th(gname), html.Td(html.Ul([html.Li(x) for x in pretty]))]))
-
-    # --- Kvote 1 pr. sted (robust to comma-decimals) ---
     if 'kvote_1_kvotient' in providers.columns:
         tmp = providers.copy()
         tmp['kvote_num'] = to_num(tmp['kvote_1_kvotient'])
         tmp = tmp[tmp['kvote_num'].notna()]
 
-        # If multiple rows per provider/location, keep the highest kvote shown (or change rule)
         grp_keys = [c for c in ['hovedinsttx', 'instkommunetx'] if c in tmp.columns]
         if grp_keys:
             tmp = (tmp.sort_values('kvote_num', ascending=False)
@@ -343,7 +382,6 @@ def build_detail_table(df_all, edu_title):
 
     table = html.Table([html.Tbody(rows)], style={"width":"100%","borderCollapse":"collapse"})
 
-    # Provider list for mapping (keep all rows; do not over-deduplicate)
     keep_cols = ['hovedinsttx','instkommunetx','instregiontx','udbud_id','artikel_id','titel',
                  'kvote_1_kvotient','standby_8','inst_lat','inst_lon']
     keep_cols = [c for c in keep_cols if c in providers.columns]
@@ -359,17 +397,12 @@ MUNICIPALITY_COORDS = {
     "Esbjerg":   (55.4767,  8.4520),
     "Roskilde":  (55.6415, 12.0803),
     "Kolding":   (55.4904,  9.4721),
-    # Extend with more municipalities as needed
 }
 
 def _ensure_latlon_from_municipality(df_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    If inst_lat/inst_lon are missing, fill from MUNICIPALITY_COORDS using instkommunetx.
-    """
     df = df_in.copy()
     if 'inst_lat' not in df.columns: df['inst_lat'] = np.nan
     if 'inst_lon' not in df.columns: df['inst_lon'] = np.nan
-
     if 'instkommunetx' in df.columns:
         mask = df['inst_lat'].isna() | df['inst_lon'].isna()
         for idx in df[mask].index:
@@ -381,11 +414,6 @@ def _ensure_latlon_from_municipality(df_in: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def build_providers_map(providers_df):
-    """
-    Plot providers on a map. If lat/lon missing, backfill from municipality mapping.
-    Zoomed to Denmark by default, with slight auto-adjust from spread.
-    Includes Kvote 1 / Standby in hover with locale-safe parsing.
-    """
     if providers_df.empty:
         fig = go.Figure()
         fig.update_layout(template="plotly_dark",
@@ -393,16 +421,12 @@ def build_providers_map(providers_df):
                           margin=dict(t=0,l=0,r=0,b=0))
         return fig
 
-    # Backfill coords
     providers_geo = _ensure_latlon_from_municipality(providers_df)
-
-    # Parse numbers for hover
     if 'kvote_1_kvotient' in providers_geo.columns:
         providers_geo['kvote_num'] = to_num(providers_geo['kvote_1_kvotient'])
     if 'standby_8' in providers_geo.columns:
         providers_geo['standby_num'] = to_num(providers_geo['standby_8'])
 
-    # Keep rows that have coordinates
     providers_geo = providers_geo.dropna(subset=['inst_lat','inst_lon'])
     if providers_geo.empty:
         fig = go.Figure()
@@ -416,12 +440,9 @@ def build_providers_map(providers_df):
                           margin=dict(t=0,l=0,r=0,b=0))
         return fig
 
-    # Hover fields
     hover_cols = [c for c in ['instkommunetx','instregiontx','titel'] if c in providers_geo.columns]
-    if 'kvote_num' in providers_geo.columns:
-        hover_cols.append('kvote_num')
-    if 'standby_num' in providers_geo.columns:
-        hover_cols.append('standby_num')
+    if 'kvote_num' in providers_geo.columns:   hover_cols.append('kvote_num')
+    if 'standby_num' in providers_geo.columns: hover_cols.append('standby_num')
 
     fig = px.scatter_mapbox(
         providers_geo,
@@ -431,7 +452,6 @@ def build_providers_map(providers_df):
         zoom=6, height=520
     )
 
-    # Denmark-friendly center & auto tweak
     lats = providers_geo['inst_lat'].astype(float)
     lons = providers_geo['inst_lon'].astype(float)
     lat_span = float(lats.max() - lats.min()) if len(lats) else 0.0
@@ -440,10 +460,8 @@ def build_providers_map(providers_df):
     center_lon = float(lons.mean()) if len(lons) else 10.5
 
     base_zoom = 6.0
-    if max(lat_span, lon_span) < 0.8:
-        base_zoom = 7.5
-    elif max(lat_span, lon_span) > 6:
-        base_zoom = 5.2
+    if max(lat_span, lon_span) < 0.8: base_zoom = 7.5
+    elif max(lat_span, lon_span) > 6: base_zoom = 5.2
 
     fig.update_layout(
         mapbox_style="open-street-map",
@@ -454,69 +472,136 @@ def build_providers_map(providers_df):
         margin=dict(t=0,l=0,r=0,b=0)
     )
 
-    # Friendly hover
     has_k = 'kvote_num' in providers_geo.columns
     has_s = 'standby_num' in providers_geo.columns
     hover_t = "<b>%{hovertext}</b><br>"
-    if 'instkommunetx' in providers_geo.columns:
-        hover_t += "Kommune: %{customdata[0]}<br>"
+    if 'instkommunetx' in providers_geo.columns: hover_t += "Kommune: %{customdata[0]}<br>"
     if 'instregiontx' in providers_geo.columns:
-        idx = hover_cols.index('instregiontx')
-        hover_t += f"Region: %{{customdata[{idx}]}}<br>"
+        idx = hover_cols.index('instregiontx'); hover_t += f"Region: %{{customdata[{idx}]}}<br>"
     if has_k:
-        idx = hover_cols.index('kvote_num')
-        hover_t += f"Kvote 1: %{{customdata[{idx}]:.2f}}<br>"
+        idx = hover_cols.index('kvote_num'); hover_t += f"Kvote 1: %{{customdata[{idx}]:.2f}}<br>"
     if has_s:
-        idx = hover_cols.index('standby_num')
-        hover_t += f"Standby (8): %{{customdata[{idx}]:.2f}}<br>"
+        idx = hover_cols.index('standby_num'); hover_t += f"Standby (8): %{{customdata[{idx}]:.2f}}<br>"
     hover_t += "<extra></extra>"
 
     fig.update_traces(hovertemplate=hover_t, marker=dict(size=12))
     return fig
 
+# ---------- Treemap builder (CITY + METRIC)  [FIXED AGG] ----------
+def build_city_treemap(city_value, metric_key):
+    if metric_key not in SIZE_METRICS:
+        metric_key = 'optagne'
+    metric_col, how, metric_label = SIZE_METRICS[metric_key]
+
+    # filter by city (or all)
+    if city_value and city_value != '__ALL__':
+        df_sel = df_prov[df_prov['instkommunetx'] == city_value].copy()
+    else:
+        df_sel = df_prov.copy()
+
+    # require taxonomy + metric
+    df_sel = df_sel.dropna(subset=['educational_category','cluster_label','titel'])
+    df_sel = df_sel[~df_sel[metric_col].isna()]
+
+    if df_sel.empty:
+        fig = go.Figure()
+        fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
+                          font_color=FONT_COL, margin=dict(t=30,l=20,r=20,b=20))
+        fig.add_annotation(text="Ingen data for valgte filter.", showarrow=False,
+                           x=0.5,y=0.5,xref="paper",yref="paper")
+        return fig
+
+    # aggregate by title within taxonomy using sum or mean (no FutureWarning)
+    if how == 'sum':
+        grouped = (df_sel
+                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .sum()
+                   .rename(columns={metric_col: 'size'}))
+    else:  # 'mean'
+        grouped = (df_sel
+                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .mean()
+                   .rename(columns={metric_col: 'size'}))
+
+    grouped = grouped[np.isfinite(grouped['size'])]
+    grouped = grouped[grouped['size'] > 0]
+
+    title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
+
+    fig = px.treemap(
+        grouped,
+        path=['educational_category','cluster_label','titel'],
+        values='size',
+        color='size',
+        color_continuous_scale=px.colors.sequential.Blues
+    )
+    fig.update_layout(
+        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
+        margin=dict(t=50,l=30,r=50,b=20), title=title_txt
+    )
+    fig.update_coloraxes(colorbar=dict(title=metric_label,
+                                       tickfont=dict(color=FONT_COL),
+                                       titlefont=dict(color=FONT_COL)))
+    fig.update_traces(root_color="#1c1f26",
+                      marker_colorbar=dict(tickfont=dict(color=FONT_COL),
+                                           titlefont=dict(color=FONT_COL),
+                                           outlinecolor="#2a2f3a"))
+    return fig
+
 # ---------- Dash app ----------
 app = Dash(__name__)
-titles_options = sorted(df['titel'].dropna().unique())
+titles_options = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
 
+# ---------- Layout ----------
 app.layout = html.Div(
     style={"padding":"12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight":"100vh"},
     children=[
-        # Top row: Treemap + selectors
+        # Top row: City Treemap + selectors
         html.Div([
-            html.Div([ dcc.Graph(id="treemap", figure=treemap, style={"height":"560px", "width":"100%"}) ],
-                     style={"flex":"1 1 800px", "minWidth":"600px"}),
+            html.Div([
+                html.Div([
+                    html.Div("Filtrér efter kommune:", style={"marginBottom":"6px","fontWeight":"600"}),
+                    dcc.Dropdown(CITY_OPTIONS, id="city_select", value="__ALL__", clearable=False,
+                                 style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
+                    html.Div("Vælg størrelse for klynger:", style={"marginBottom":"6px","fontWeight":"600"}),
+                    dcc.Dropdown(SIZE_OPTIONS, id="size_metric", value="optagne", clearable=False,
+                                 style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
+                ], style={**CUSTOM_CARD, "marginBottom":"10px"}),
+                dcc.Graph(id="treemap", style={"height":"560px", "width":"100%"})
+            ], style={"flex":"1 1 800px", "minWidth":"600px"}),
+
             html.Div([
                 html.Div("Vælg op til 3 uddannelser:", style={"marginBottom":"8px", "fontWeight":"600"}),
                 dcc.Dropdown(titles_options, id="edu1", placeholder="Uddannelse A", clearable=True,
-                             style={"marginBottom":"10px", "backgroundColor":"#1f2630", "color":FONT_COL, "border":"1px solid #2a2f3a"}),
+                             style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
                 dcc.Dropdown(titles_options, id="edu2", placeholder="Uddannelse B", clearable=True,
-                             style={"marginBottom":"10px", "backgroundColor":"#1f2630", "color":FONT_COL, "border":"1px solid #2a2f3a"}),
+                             style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
                 dcc.Dropdown(titles_options, id="edu3", placeholder="Uddannelse C", clearable=True,
-                             style={"backgroundColor":"#1f2630", "color":FONT_COL, "border":"1px solid #2a2f3a"}),
+                             style={"backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
                 html.Div("Tip: Radar viser rå Likert (1–5). Løn/ledighed i søjlerne til højre.",
-                         style={"marginTop":"12px", "color":"#9aa4b2", "fontSize":"12px"})
-            ], style={"flex":"0 0 360px", "maxWidth":"360px", **CUSTOM_CARD})
-        ], style={"display":"flex", "gap":"16px", "alignItems":"flex-start", "flexWrap":"wrap"}),
+                         style={"marginTop":"12px","color":"#9aa4b2","fontSize":"12px"})
+            ], style={"flex":"0 0 360px","maxWidth":"360px", **CUSTOM_CARD})
+        ], style={"display":"flex","gap":"16px","alignItems":"flex-start","flexWrap":"wrap"}),
 
         html.Hr(style={"borderColor":"#2a2f3a"}),
 
-        # Radar (60%) + KPI sidebar (40%)
+        # Radar + KPI
         html.Div([
             html.Div([ dcc.Graph(id="radar", style={"height":"560px"}) ],
-                     style={"flex":"3 1 0px", "minWidth":"520px"}),
+                     style={"flex":"3 1 0px","minWidth":"520px"}),
             html.Div([
-                html.Div(id="bachelor_notice", style={**CUSTOM_CARD, "display":"none", "marginBottom":"8px"}),
-                dcc.Graph(id="bar_afbrud",   style={"height":"200px", "marginBottom":"10px"}),
-                dcc.Graph(id="bar_ledighed", style={"height":"200px", "marginBottom":"10px"}),
+                html.Div(id="bachelor_notice", style={**CUSTOM_CARD,"display":"none","marginBottom":"8px"}),
+                dcc.Graph(id="bar_afbrud",   style={"height":"200px","marginBottom":"10px"}),
+                dcc.Graph(id="bar_ledighed", style={"height":"200px","marginBottom":"10px"}),
                 dcc.Graph(id="bar_loen_ny",  style={"height":"200px"})
             ], style={"flex":"2 1 0px", **CUSTOM_CARD})
         ], style={"display":"flex","gap":"16px","alignItems":"stretch","flexWrap":"wrap"}),
 
         html.Hr(style={"borderColor":"#2a2f3a"}),
 
-        # Multi-bachelor exploration (bar + heatmap)
+        # Multi-bachelor exploration (bar + SANKEY)
         html.Div("Udforsk kandidat-retninger (vælg flere bachelorer)",
-                 style={"fontWeight":"600", "marginBottom":"6px"}),
+                 style={"fontWeight":"600","marginBottom":"6px"}),
         dcc.Dropdown(
             options=[{"label":t, "value":t} for t in bachelor_titles_multi],
             id="bachelor_multi",
@@ -526,54 +611,40 @@ app.layout = html.Div(
         ),
         html.Div([
             html.Div([ dcc.Graph(id="kandidat_bar", style={"height":"480px"}) ],
-                     style={"flex":"1 1 520px", "minWidth":"420px"}),
-            html.Div([ dcc.Graph(id="kandidat_heatmap", style={"height":"480px"}) ],
-                     style={"flex":"1 1 520px", "minWidth":"420px"}),
+                     style={"flex":"1 1 520px","minWidth":"420px"}),
+            html.Div([ dcc.Graph(id="kandidat_flow", style={"height":"480px"}) ],
+                     style={"flex":"1 1 520px","minWidth":"420px"}),
         ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
 
-        # --- Detail panel (provider-level) ---
+        # --- Detail panel ---
         html.Hr(style={"borderColor":"#2a2f3a"}),
-        html.Div("Detaljer for valgt uddannelse (udbydere + info)", 
-                 style={"fontWeight":"600", "marginBottom":"6px"}),
-
+        html.Div("Detaljer for valgt uddannelse (udbydere + info)",
+                 style={"fontWeight":"600","marginBottom":"6px"}),
         dcc.Dropdown(
-            options=[{"label":t, "value":t} for t in sorted(df_raw['titel'].dropna().astype(str).unique())],
+            options=AVAILABLE_OPTIONS,
             id="detail_select",
             placeholder="Vælg uddannelse (ikke nationalt niveau)",
             clearable=True,
             style={"maxWidth":"900px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a","marginBottom":"12px"}
         ),
-
         html.Div([
-            html.Div(id="detail_table", style={"flex":"1 1 520px", "minWidth":"420px", "padding":"8px",
+            html.Div(id="detail_table", style={"flex":"1 1 520px","minWidth":"420px","padding":"8px",
                                               "backgroundColor":"#11151b","border":"1px solid #2a2f3a","borderRadius":"8px"}),
             html.Div([ dcc.Graph(id="detail_map", style={"height":"520px"}) ],
-                     style={"flex":"1 1 520px", "minWidth":"420px"}),
+                     style={"flex":"1 1 520px","minWidth":"420px"}),
         ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
     ]
 )
 
-# ---------- Builders ----------
-def build_simple_bar(metric, titles, title_txt, tickprefix=""):
-    sel = df[df['titel'].isin(titles)]
-    fig = go.Figure()
-    if not sel.empty and metric in sel.columns:
-        colors = bar_colors(len(sel))
-        fig.add_trace(go.Bar(
-            x=sel['titel'], y=sel[metric],
-            marker=dict(color=colors),
-            hovertemplate="<b>%{x}</b><br>" + title_txt + ": %{y:.2f}<extra></extra>"
-        ))
-    fig.update_layout(
-        title=title_txt,
-        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
-        margin=dict(t=40, l=40, r=20, b=70),
-        xaxis=dict(tickangle=20),
-        yaxis=dict(tickprefix=tickprefix)
-    )
-    return fig
-
 # ---------- Callbacks ----------
+@app.callback(
+    Output("treemap","figure"),
+    Input("city_select","value"),
+    Input("size_metric","value")
+)
+def update_treemap(city_value, metric_key):
+    return build_city_treemap(city_value, metric_key)
+
 @app.callback(
     [Output("radar", "figure"),
      Output("bachelor_notice", "children"),
@@ -586,10 +657,9 @@ def build_simple_bar(metric, titles, title_txt, tickprefix=""):
     Input("edu3", "value"),
 )
 def update_main(a, b, c):
-    selected = [x for x in [a, b, c] if x]
+    selected = [x for x in [a, b, c] if x in AVAILABLE_SET]
     radar_fig = build_radar_raw(selected) if selected else build_radar_raw([])
 
-    # Notice for university bachelor
     notice_titles = []
     for t in selected:
         row = df[df['titel']==t]
@@ -597,7 +667,7 @@ def update_main(a, b, c):
             notice_titles.append(t)
     if notice_titles:
         msg = html.Div([
-            html.Div("Bemærk:", style={"fontWeight":"700", "marginBottom":"4px"}),
+            html.Div("Bemærk:", style={"fontWeight":"700","marginBottom":"4px"}),
             html.Div(
                 "Du har valgt en universitets-bachelor: "
                 + ", ".join(notice_titles)
@@ -617,16 +687,21 @@ def update_main(a, b, c):
     return radar_fig, msg, style, bar_afbrud, bar_ledighed, bar_loen_ny
 
 @app.callback(
-    [Output("kandidat_bar","figure"), Output("kandidat_heatmap","figure")],
+    [Output("kandidat_bar","figure"), Output("kandidat_flow","figure")],
     Input("bachelor_multi","value")
 )
 def update_multi_charts(selected):
+    empty = go.Figure()
+    empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+
     if not selected:
-        return go.Figure(), go.Figure()
+        return empty, empty
+    selected = [s for s in selected if s in bachelor_titles_multi]
+    if not selected:
+        return empty, empty
+
     flow = build_flow_df(selected)
     if flow.empty:
-        empty = go.Figure()
-        empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
         return empty, empty
 
     agg = (flow.groupby('kandidat', as_index=False)
@@ -647,30 +722,15 @@ def update_multi_charts(selected):
         margin=dict(t=50, l=10, r=20, b=40), yaxis=dict(automargin=True)
     )
 
-    top_k = 12
-    top_cands = agg['kandidat'].head(top_k).tolist()
-    hm_df = (flow[flow['kandidat'].isin(top_cands)]
-                .pivot_table(index='bachelor', columns='kandidat', values='weight', aggfunc='sum', fill_value=0)
-                .reindex(index=selected))
-    heatmap = go.Figure(go.Heatmap(
-        z=hm_df.values, x=hm_df.columns.tolist(), y=hm_df.index.tolist(),
-        colorscale=px.colors.sequential.Blues, colorbar=dict(title="Vægt"),
-        hovertemplate="Bachelor: %{y}<br>Kandidat: %{x}<br>Vægt: %{z}<extra></extra>"
-    ))
-    heatmap.update_layout(
-        title=f"Flow-matrix (top {top_k} kandidatretninger)",
-        template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
-        margin=dict(t=50, l=60, r=20, b=60), xaxis=dict(tickangle=30)
-    )
-    return bar, heatmap
+    sankey = build_sankey(flow, selected, top_k=20)
+    return bar, sankey
 
-# --- Detail panel callback (provider-level, not national) ---
 @app.callback(
     [Output("detail_table","children"), Output("detail_map","figure")],
     Input("detail_select","value")
 )
 def update_detail_panel(edu_title):
-    if not edu_title:
+    if not edu_title or edu_title not in AVAILABLE_SET:
         empty_table = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color":"#9aa4b2"})
         empty_fig = go.Figure()
         empty_fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG)
