@@ -555,7 +555,7 @@ def build_city_treemap(city_value, metric_key):
                            x=0.5, y=0.5, xref="paper", yref="paper",
                            font=dict(color=FONT_COL))
         return fig
-
+    df_sel = df_sel.drop_duplicates()
     if how == 'sum':
         grouped = (df_sel
                    .groupby(['educational_category', 'cluster_label', 'titel'], as_index=False)[metric_col]
