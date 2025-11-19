@@ -9,3 +9,22 @@
 .Select-value-label, .Select-placeholder { color: #e5e7eb !important; }
 .Select-option { background-color: #1f2630 !important; color: #e5e7eb !important; }
 .Select-option.is-focused, .Select-option:hover { background-color: #2a3340 !important; }
+
+/* assets/dark-dropdown.css */
+.Select-control,
+.Select-menu-outer,
+.Select-value {
+    background-color: #1f2630 !important;
+    color: #ffffff !important;
+    border-color: #2a2f3a !important;
+}
+
+.Select-option {
+    background-color: #1f2630 !important;
+    color: #ffffff !important;
+}
+
+.Select-option.is-focused,
+.Select-option.is-selected {
+    background-color: #223147 !important;
+}
