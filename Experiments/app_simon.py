@@ -60,13 +60,12 @@ CITY_LIST    = sorted(df_prov['instkommunetx'].dropna().astype(str).unique())
 CITY_OPTIONS = [{'label': 'Alle kommuner', 'value': '__ALL__'}] + \
                [{'label': c, 'value': c} for c in CITY_LIST]
 
-SIZE_METRICS = {
-    'optagne': ('optagne_num', 'sum', 'Optagne (sum)'),
-    'maanedloen_nyudd': ('maanedloen_nyudd_n', 'mean', 'Løn (nyudd.) (gennemsnit)'),
+# The dictionary should consist a list of [clean name, aggregation type, name short]
+col_name_info = {
+    'optagne': ('Antal optagene', 'sum', 'Optagne'),
+    'maanedloen_nyudd': ('Nyuddanet gennemsnitsløn', 'mean', 'Løn (nyudd.) (gennemsnit)'),
     'ledighed_nyudd': ('ledighed_nyudd_n', 'mean', 'Ledighed (nyudd.) (gennemsnit)')
 }
-SIZE_OPTIONS = [{'label': v[2], 'value': k} for k, v in SIZE_METRICS.items()]
-
 
 
 # ---------- kandidat_* backfill if missing ----------
@@ -122,6 +121,9 @@ PLOT_BG   = "#0f1115"
 FONT_COL  = "#ffffff"
 
 
+select_size = pn.widgets.Select(name='SIZE MARKER', options=['optagne', 'maanedloen_nyudd'])
+select_color = pn.widgets.Select(name='COLOR MARKER', options=['optagne', 'maanedloen_nyudd'])
+
 
 
 # ---------- Treemap builder (CITY + METRIC)  [FIXED AGG] ----------
@@ -138,9 +140,11 @@ def build_hierarchical_dataframe(df, levels, value_column, color_column=None, ad
         df_tree = pd.DataFrame(columns=['id', 'label', 'parent', 'value', 'color'])
         # dfg = df.groupby(levels[i:]).mean(numeric_only=True)
         dfg = df.groupby(levels[i:]).sum()
-        dfg['tmp'] = df.groupby(levels[i:]).count()[color_column]
+        dfg['tmp'] = df.groupby(levels[i:]).count()[value_column]
+        dfg['tmp2'] = df.groupby(levels[i:]).count()[color_column]
         dfg = dfg.reset_index()
         df_tree['label'] = dfg[level].copy()
+        # Make ids and parents
         df_tree['id'] = dfg[level].copy()
         for j in range(i+1, len(levels)):
             df_tree['id'] = dfg[levels[j]].copy() + "/" + df_tree['id']
@@ -152,8 +156,15 @@ def build_hierarchical_dataframe(df, levels, value_column, color_column=None, ad
                 j += 1
         else:
             df_tree['parent'] = ''
-        df_tree['value'] = dfg[value_column] 
-        df_tree['color'] = dfg[color_column] / dfg['tmp']
+        
+        if col_name_info[value_column][1] == 'sum' or i != 0:
+            df_tree['value'] = dfg[value_column] 
+        else:
+            df_tree['value'] = dfg[value_column] / dfg['tmp']
+        if col_name_info[color_column][1] == 'sum' or i != 0:
+            df_tree['color'] = dfg[color_column]
+        else:
+            df_tree['color'] = dfg[color_column] / dfg['tmp2']
         for ac in addtional_cols:
             df_tree[ac] = dfg[ac] / dfg['tmp']
         df_list.append(df_tree)
@@ -171,11 +182,8 @@ df_tree = df_tree.dropna()
 
 
 
-def build_city_treemap(city_value, metric_key):
-    if metric_key not in SIZE_METRICS:
-        metric_key = 'optagne'
-    metric_col, how, metric_label = SIZE_METRICS[metric_key]
-
+def build_city_treemap(city_value, metric_col, additional_cols=[]):
+    all_cols = [metric_col] + additional_cols
     # filter by city (or all)
     if city_value and city_value != '__ALL__':
         df_sel = df_prov[df_prov['instkommunetx'] == city_value].copy()
@@ -185,34 +193,19 @@ def build_city_treemap(city_value, metric_key):
     # require taxonomy + metric
     df_sel = df_sel.dropna(subset=['educational_category','cluster_label','titel'])
     df_sel = df_sel[~df_sel[metric_col].isna()]
+    df_sel = df_sel.drop_duplicates()
+    # aggregate
+    grouped = (df_sel
+                .groupby(['educational_category','cluster_label','titel'], as_index=False)[all_cols]
+                .sum())
+                # .rename(columns={metric_col: 'size'}))
 
-    if df_sel.empty:
-        fig = go.Figure()
-        fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-                          font_color=FONT_COL, margin=dict(t=30,l=20,r=20,b=20))
-        fig.add_annotation(text="Ingen data for valgte filter.", showarrow=False,
-                           x=0.5,y=0.5,xref="paper",yref="paper",
-                           font=dict(color=FONT_COL))
-        return fig
+    grouped = grouped[np.isfinite(grouped[metric_col])]
+    grouped = grouped[grouped[metric_col] > 0]
 
-    # aggregate by title within taxonomy using sum or mean (no FutureWarning)
-    if how == 'sum':
-        grouped = (df_sel
-                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
-                   .sum()
-                   .rename(columns={metric_col: 'size'}))
-    else:  # 'mean'
-        grouped = (df_sel
-                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
-                   .mean()
-                   .rename(columns={metric_col: 'size'}))
-
-    grouped = grouped[np.isfinite(grouped['size'])]
-    grouped = grouped[grouped['size'] > 0]
-
-    title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
-
-    df_new = build_hierarchical_dataframe(grouped, levels, 'size', 'size')
+    title_txt = f"{metric_col} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
+    
+    df_new = build_hierarchical_dataframe(grouped, levels, metric_col, metric_col)
 
     fig = go.Figure(go.Treemap(
         ids=df_new['id'],
@@ -224,39 +217,53 @@ def build_city_treemap(city_value, metric_key):
         marker=dict(
             colors=df_new['color'],
             colorscale='Blues',
+            pad=dict(b=1, l=1, r=1, t=18),              # padding around each tile
+            line=dict(width=1, color='darkgrey'),  # border line around each tile
             # pattern=dict(shape=["|"], solidity=0.80)
+            pattern=dict(
+                shape='x' if df_new['id']=='Universitetsuddannelser/IT - teknik - produktion/Actuarial Mathematics' else '',  # Apply 'x' pattern only to Tile C
+            )
             ),
-        hovertemplate='<b>%{label} </b> <br> Size: %{value:,.0f} kr. <br> Faglig miljø: %{color:.2f}<extra>this is in the extra thing%{fullData.name}</extra>',
+        hovertemplate=f'<b>%{{label}} </b> <br> {col_name_info[metric_col][2]}: %{{value:,.0f}} kr. <br> Faglig miljø: %{{color:.2f}}<extra>this is in the extra thing%{{fullData.name}}</extra>',
         name='',
         # textinfo = "label+value+percent parent+percent entry",
         root_color="lightgrey",
-        texttemplate='<b>%{label}</b><br>size: %{value:,.0f}<br>The parent: %{percentParent:.1%} and custom data is:  %{customdata[0]}',
+        texttemplate=f'<b>%{{label}}</b><br>{col_name_info[metric_col][2]}: %{{value:,.0f}}<br>The parent: %{{percentParent:.1%}} and custom data is:  %{{customdata[4]}}',
         maxdepth=3,
+        
         ))
     fig.update_layout(
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
         margin=dict(t=50,l=30,r=50,b=20), title=title_txt
     )
-    fig.update_coloraxes(colorbar=dict(title=metric_label,
+    fig.update_coloraxes(colorbar=dict(title=metric_col,
                                        tickfont=dict(color=FONT_COL),
                                        titlefont=dict(color=FONT_COL)))
     fig.update_traces(root_color="#1c1f26",
                       marker_colorbar=dict(tickfont=dict(color=FONT_COL),
                                            titlefont=dict(color=FONT_COL),
                                            outlinecolor="#2a2f3a"))
-    print(grouped.head())
+    print(df_new.head())
+    print(len(df_new))
+    print(df_sel.head())
+    print(len(df_sel))
     return fig
 
-fig = build_city_treemap(city_value='__ALL__', metric_key='optagne')
-
+fig = build_city_treemap(city_value='__ALL__', metric_col=select_size.value, additional_cols=['fagligmiljo_likert'])
+# fig = build_city_treemap(city_value='__ALL__', metric_col='optagne', additional_cols=['fagligmiljo_likert'])
+print(select_size.value)
 
 # Create a Panel pane that wraps the Plotly figure
 plot = pn.pane.Plotly(fig, sizing_mode="stretch_both")
+# Craetea a panel figure that depends on the select_size value
+def update_plot(event):
+    new_fig = build_city_treemap(city_value='__ALL__', metric_col=select_size.value, additional_cols=['fagligmiljo_likert'])
+    plot.object = new_fig
+select_size.param.watch(update_plot, 'value')
+
 
 # (Optional) Add widgets or layout if you want
 title = pn.pane.Markdown("# Its a treemap")
-select_size = pn.widgets.Select(name='SIZE MARKER', options=['Biology', 'Chemistry', 'Physics'])
-select_color = pn.widgets.Select(name='COLOR MARKER', options=['Biology', 'Chemistry', 'Physics'])
 selections = pn.Row(select_size, select_color)
 layout = pn.Column(title, selections, plot)
 
@@ -265,6 +272,9 @@ text_field = pn.widgets.TextInput(name="Description", placeholder="Enter descrip
 
 # Add the text field to the layout
 layout.append(text_field)
+
+# Add markdown text below
+layout.append(pn.pane.Markdown(f"### Additional Information\nYou can add more details about the treemap here.{select_size.value}"))
 
 # Serve the app
 layout.servable()
