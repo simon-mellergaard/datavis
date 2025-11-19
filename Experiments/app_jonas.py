@@ -573,9 +573,15 @@ def build_city_treemap(city_value, metric_key):
     title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
     df_new = build_hierarchical_dataframe(grouped, TREEMAP_LEVELS, 'size', 'size')
 
+    # normalize the marker color column so we know which nodes are dark vs. light
+    color_vals = df_new['color'].astype(float)
+    span = float(color_vals.max() - color_vals.min()) or 1.0
+    norm = (color_vals - color_vals.min()) / span
+    text_colors = np.where(norm > 0.35, '#f8f9ff', '#11151b')  # dark tiles → light text, light tiles → dark text
+
     hover_text = (
         f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
-        "%{percentParent:.1%}"
+        "%{percentParent:.1%} af niveauet over<br>"
         "%{percentEntry:.1%} af totalen<extra></extra>"
     )
 
@@ -595,11 +601,18 @@ def build_city_treemap(city_value, metric_key):
             )
         ),
         texttemplate=f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>%{{percentParent:.1%}}",
-        textfont=dict(color=FONT_COL),
+        textfont=dict(color=text_colors),
         hovertemplate=hover_text,
         maxdepth=3,
         name=''
     ))
+
+    hover_text = (
+        f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
+        "%{percentParent:.1%}"
+        "%{percentEntry:.1%} af totalen<extra></extra>"
+    )
+
     fig.update_layout(
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
         margin=dict(t=50, l=30, r=50, b=20), title=title_txt
