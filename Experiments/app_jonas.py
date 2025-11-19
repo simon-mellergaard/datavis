@@ -609,7 +609,7 @@ def build_city_treemap(city_value, metric_key):
 
 
 # ---------- Dash app ----------
-app = Dash(__name__)
+app = Dash(__name__, assets_folder="../Archive/Experiments/assets") #points the DASH app to the correct assets folder for CSS
 titles_options = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
 
 # ---------- Layout ----------
