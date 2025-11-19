@@ -495,40 +495,75 @@ def build_providers_map(providers_df):
     fig.update_traces(hovertemplate=hover_t, marker=dict(size=12))
     return fig
 
+# place this just above line 498
+TREEMAP_LEVELS = ['titel', 'cluster_label', 'educational_category']
+
+def build_hierarchical_dataframe(source_df, levels, value_column, color_column):
+    frames = []
+    for i, level in enumerate(levels):
+        df_tree = pd.DataFrame(columns=['id', 'label', 'parent', 'value', 'color'])
+        grouped = source_df.groupby(levels[i:]).sum(numeric_only=True)
+        grouped['tmp'] = source_df.groupby(levels[i:]).count()[color_column]
+        grouped = grouped.reset_index()
+
+        df_tree['label'] = grouped[level].astype(str)
+        df_tree['id'] = df_tree['label']
+        for j in range(i + 1, len(levels)):
+            df_tree['id'] = grouped[levels[j]].astype(str) + "/" + df_tree['id']
+
+        if i < len(levels) - 1:
+            parent = grouped[levels[i + 1]].astype(str)
+            j = i + 1
+            while j < len(levels) - 1:
+                parent = grouped[levels[j + 1]].astype(str) + "/" + parent
+                j += 1
+            df_tree['parent'] = parent
+        else:
+            df_tree['parent'] = ''
+
+        values = grouped[value_column].astype(float).to_numpy()
+        counts = grouped['tmp'].astype(float).to_numpy()
+        df_tree['value'] = values
+        df_tree['color'] = np.divide(values, counts,
+                                     out=np.zeros(len(values), dtype=float),
+                                     where=counts != 0)
+        frames.append(df_tree)
+
+    return pd.concat(frames, ignore_index=True)
+
+
+
 # ---------- Treemap builder (CITY + METRIC)  [FIXED AGG] ----------
 def build_city_treemap(city_value, metric_key):
     if metric_key not in SIZE_METRICS:
         metric_key = 'optagne'
     metric_col, how, metric_label = SIZE_METRICS[metric_key]
 
-    # filter by city (or all)
     if city_value and city_value != '__ALL__':
         df_sel = df_prov[df_prov['instkommunetx'] == city_value].copy()
     else:
         df_sel = df_prov.copy()
 
-    # require taxonomy + metric
-    df_sel = df_sel.dropna(subset=['educational_category','cluster_label','titel'])
+    df_sel = df_sel.dropna(subset=['educational_category', 'cluster_label', 'titel'])
     df_sel = df_sel[~df_sel[metric_col].isna()]
 
     if df_sel.empty:
         fig = go.Figure()
         fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-                          font_color=FONT_COL, margin=dict(t=30,l=20,r=20,b=20))
+                          font_color=FONT_COL, margin=dict(t=30, l=20, r=20, b=20))
         fig.add_annotation(text="Ingen data for valgte filter.", showarrow=False,
-                           x=0.5,y=0.5,xref="paper",yref="paper",
+                           x=0.5, y=0.5, xref="paper", yref="paper",
                            font=dict(color=FONT_COL))
         return fig
 
-    # aggregate by title within taxonomy using sum or mean (no FutureWarning)
     if how == 'sum':
         grouped = (df_sel
-                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .groupby(['educational_category', 'cluster_label', 'titel'], as_index=False)[metric_col]
                    .sum()
                    .rename(columns={metric_col: 'size'}))
-    else:  # 'mean'
+    else:
         grouped = (df_sel
-                   .groupby(['educational_category','cluster_label','titel'], as_index=False)[metric_col]
+                   .groupby(['educational_category', 'cluster_label', 'titel'], as_index=False)[metric_col]
                    .mean()
                    .rename(columns={metric_col: 'size'}))
 
@@ -536,26 +571,42 @@ def build_city_treemap(city_value, metric_key):
     grouped = grouped[grouped['size'] > 0]
 
     title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
+    df_new = build_hierarchical_dataframe(grouped, TREEMAP_LEVELS, 'size', 'size')
 
-    fig = px.treemap(
-        grouped,
-        path=['educational_category','cluster_label','titel'],
-        values='size',
-        color='size',
-        color_continuous_scale=px.colors.sequential.Blues
+    hover_text = (
+        f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
+        "%{percentParent:.1%}"
+        "%{percentEntry:.1%} af totalen<extra></extra>"
     )
+
+    fig = go.Figure(go.Treemap(
+        ids=df_new['id'],
+        labels=df_new['label'],
+        parents=df_new['parent'],
+        values=df_new['value'],
+        branchvalues='total',
+        marker=dict(
+            colors=df_new['color'],
+            colorscale='Blues',
+            colorbar=dict(
+                title=dict(text=metric_label, font=dict(color=FONT_COL)),
+                tickfont=dict(color=FONT_COL),
+                outlinecolor="#2a2f3a"
+            )
+        ),
+        texttemplate=f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>%{{percentParent:.1%}}",
+        textfont=dict(color=FONT_COL),
+        hovertemplate=hover_text,
+        maxdepth=3,
+        name=''
+    ))
     fig.update_layout(
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
-        margin=dict(t=50,l=30,r=50,b=20), title=title_txt
+        margin=dict(t=50, l=30, r=50, b=20), title=title_txt
     )
-    fig.update_coloraxes(colorbar=dict(title=metric_label,
-                                       tickfont=dict(color=FONT_COL),
-                                       titlefont=dict(color=FONT_COL)))
-    fig.update_traces(root_color="#1c1f26",
-                      marker_colorbar=dict(tickfont=dict(color=FONT_COL),
-                                           titlefont=dict(color=FONT_COL),
-                                           outlinecolor="#2a2f3a"))
+    fig.update_traces(root_color="#1c1f26")
     return fig
+
 
 # ---------- Dash app ----------
 app = Dash(__name__)
