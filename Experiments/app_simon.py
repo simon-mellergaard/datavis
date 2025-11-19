@@ -219,14 +219,15 @@ def build_city_treemap(city_value, metric_key):
         values=df_new['value'],
         branchvalues='total',
         marker=dict(
-            # colors=df_new['color'],
-            # colorscale='Blues',
-            pattern=dict(shape=["|"], solidity=0.80)),
+            colors=df_new['color'],
+            colorscale='Blues',
+            # pattern=dict(shape=["|"], solidity=0.80)
+            ),
         hovertemplate='<b>%{label} </b> <br> Løn: %{value:,.0f} kr. <br> Faglig miljø: %{color:.2f}',
         name='',
         # textinfo = "label+value+percent parent+percent entry",
         root_color="lightgrey",
-        texttemplate='<b>%{label}</b><br>size=%{value:,.0f}<br>The parent: %{percentParent:.1%}',
+        texttemplate='<b>%{label}</b><br>size: %{value:,.0f}<br>The parent: %{percentParent:.1%}',
         maxdepth=3,
         # marker=dict(pattern=dict(shape=["|"], solidity=0.80)),
         ))
