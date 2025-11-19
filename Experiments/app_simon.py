@@ -126,7 +126,7 @@ FONT_COL  = "#ffffff"
 
 # ---------- Treemap builder (CITY + METRIC)  [FIXED AGG] ----------
 levels = ['titel', 'cluster_label', 'educational_category']
-def build_hierarchical_dataframe(df, levels, value_column, color_columns=None):
+def build_hierarchical_dataframe(df, levels, value_column, color_column=None, addtional_cols=[]):
     """
     Build a hierarchy of levels for Sunburst or Treemap charts.
 
@@ -138,7 +138,7 @@ def build_hierarchical_dataframe(df, levels, value_column, color_columns=None):
         df_tree = pd.DataFrame(columns=['id', 'label', 'parent', 'value', 'color'])
         # dfg = df.groupby(levels[i:]).mean(numeric_only=True)
         dfg = df.groupby(levels[i:]).sum()
-        dfg['tmp'] = df.groupby(levels[i:]).count()[color_columns]
+        dfg['tmp'] = df.groupby(levels[i:]).count()[color_column]
         dfg = dfg.reset_index()
         df_tree['label'] = dfg[level].copy()
         df_tree['id'] = dfg[level].copy()
@@ -153,7 +153,9 @@ def build_hierarchical_dataframe(df, levels, value_column, color_columns=None):
         else:
             df_tree['parent'] = ''
         df_tree['value'] = dfg[value_column] 
-        df_tree['color'] = dfg[color_columns] / dfg['tmp']
+        df_tree['color'] = dfg[color_column] / dfg['tmp']
+        for ac in addtional_cols:
+            df_tree[ac] = dfg[ac] / dfg['tmp']
         df_list.append(df_tree)
     # total = pd.Series(dict(label='total', parent='',
     #                           value=df[value_column].sum(),
@@ -217,19 +219,19 @@ def build_city_treemap(city_value, metric_key):
         labels=df_new['label'],
         parents=df_new['parent'],
         values=df_new['value'],
+        customdata=df_new,
         branchvalues='total',
         marker=dict(
             colors=df_new['color'],
             colorscale='Blues',
             # pattern=dict(shape=["|"], solidity=0.80)
             ),
-        hovertemplate='<b>%{label} </b> <br> Løn: %{value:,.0f} kr. <br> Faglig miljø: %{color:.2f}',
+        hovertemplate='<b>%{label} </b> <br> Size: %{value:,.0f} kr. <br> Faglig miljø: %{color:.2f}<extra>this is in the extra thing%{fullData.name}</extra>',
         name='',
         # textinfo = "label+value+percent parent+percent entry",
         root_color="lightgrey",
-        texttemplate='<b>%{label}</b><br>size: %{value:,.0f}<br>The parent: %{percentParent:.1%}',
+        texttemplate='<b>%{label}</b><br>size: %{value:,.0f}<br>The parent: %{percentParent:.1%} and custom data is:  %{customdata[0]}',
         maxdepth=3,
-        # marker=dict(pattern=dict(shape=["|"], solidity=0.80)),
         ))
     fig.update_layout(
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
@@ -242,6 +244,7 @@ def build_city_treemap(city_value, metric_key):
                       marker_colorbar=dict(tickfont=dict(color=FONT_COL),
                                            titlefont=dict(color=FONT_COL),
                                            outlinecolor="#2a2f3a"))
+    print(grouped.head())
     return fig
 
 fig = build_city_treemap(city_value='__ALL__', metric_key='optagne')
