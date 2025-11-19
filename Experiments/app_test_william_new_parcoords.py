@@ -94,7 +94,7 @@ def create_parallel_scatter(selected_titles, selected_vars):
 
     fig.update_layout(
         xaxis=dict(tickvals=x_coords, ticktext=['']*len(selected_vars), showgrid=False),
-        yaxis=dict(title='Value', range=[0.8,5.5], dtick=1, showgrid=True),
+        yaxis=dict(title='Value', range=[3,5], dtick=1, showgrid=True),
         height=600,
         margin=dict(l=80,r=80,t=40,b=40),
         dragmode=False,  # disable drag/zoom
