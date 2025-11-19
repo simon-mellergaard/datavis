@@ -98,7 +98,7 @@ if 'kandidat_titler' not in df.columns or 'kandidat_refs' not in df.columns:
         kand_titles.append(" | ".join(titles))
         kand_refs.append(" | ".join(keys))
     df['kandidat_titler'] = kand_titles
-    df['kandidat_refs'] = kand_refs
+    df['kandidat_refs']   = kand_refs
 
 # ---------- AVAILABLE TITLES for other selectors ----------
 available_titles_all = df_prov.dropna(subset=['educational_category','cluster_label','titel'])['titel'] \
@@ -115,8 +115,16 @@ bachelor_titles_multi = sorted(
 # ---------- Theme ----------
 CUSTOM_BG = "#0f1115"
 PLOT_BG   = "#0f1115"
-FONT_COL  = "#e5e7eb"
-CUSTOM_CARD = {"padding":"8px","backgroundColor":"#11151b","border":"1px solid #2a2f3a","borderRadius":"8px"}
+
+# brighter text color for readability
+FONT_COL  = "#ffffff"
+
+CUSTOM_CARD = {
+    "padding":"8px",
+    "backgroundColor":"#11151b",
+    "border":"1px solid #2a2f3a",
+    "borderRadius":"8px"
+}
 
 # ---------- Radar (Likert; raw values) ----------
 radar_vars = [
@@ -418,7 +426,7 @@ def build_providers_map(providers_df):
         fig = go.Figure()
         fig.update_layout(template="plotly_dark",
                           paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-                          margin=dict(t=0,l=0,r=0,b=0))
+                          margin=dict(t=0,l=0,r=0,b=0), font_color=FONT_COL)
         return fig
 
     providers_geo = _ensure_latlon_from_municipality(providers_df)
@@ -437,7 +445,7 @@ def build_providers_map(providers_df):
         )
         fig.update_layout(template="plotly_dark",
                           paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
-                          margin=dict(t=0,l=0,r=0,b=0))
+                          margin=dict(t=0,l=0,r=0,b=0), font_color=FONT_COL)
         return fig
 
     hover_cols = [c for c in ['instkommunetx','instregiontx','titel'] if c in providers_geo.columns]
@@ -508,7 +516,8 @@ def build_city_treemap(city_value, metric_key):
         fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG,
                           font_color=FONT_COL, margin=dict(t=30,l=20,r=20,b=20))
         fig.add_annotation(text="Ingen data for valgte filter.", showarrow=False,
-                           x=0.5,y=0.5,xref="paper",yref="paper")
+                           x=0.5,y=0.5,xref="paper",yref="paper",
+                           font=dict(color=FONT_COL))
         return fig
 
     # aggregate by title within taxonomy using sum or mean (no FutureWarning)
@@ -554,87 +563,172 @@ titles_options = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
 
 # ---------- Layout ----------
 app.layout = html.Div(
-    style={"padding":"12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight":"100vh"},
+    style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
     children=[
         # Top row: City Treemap + selectors
         html.Div([
+            # Left: filters + treemap
             html.Div([
                 html.Div([
-                    html.Div("Filtrér efter kommune:", style={"marginBottom":"6px","fontWeight":"600"}),
-                    dcc.Dropdown(CITY_OPTIONS, id="city_select", value="__ALL__", clearable=False,
-                                 style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
-                    html.Div("Vælg størrelse for klynger:", style={"marginBottom":"6px","fontWeight":"600"}),
-                    dcc.Dropdown(SIZE_OPTIONS, id="size_metric", value="optagne", clearable=False,
-                                 style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
-                ], style={**CUSTOM_CARD, "marginBottom":"10px"}),
-                dcc.Graph(id="treemap", style={"height":"560px", "width":"100%"})
-            ], style={"flex":"1 1 800px", "minWidth":"600px"}),
+                    html.Div("Filtrér efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                    dcc.Dropdown(
+                        CITY_OPTIONS,
+                        id="city_select",
+                        value="__ALL__",
+                        clearable=False,
+                        style={
+                            "marginBottom": "10px",
+                            "backgroundColor": "#1f2630",
+                            "color": FONT_COL,
+                            "border": "1px solid #2a2f3a",
+                        },
+                        className="dark-dropdown",
+                    ),
+                    html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                    dcc.Dropdown(
+                        SIZE_OPTIONS,
+                        id="size_metric",
+                        value="optagne",
+                        clearable=False,
+                        style={
+                            "marginBottom": "10px",
+                            "backgroundColor": "#1f2630",
+                            "color": FONT_COL,
+                            "border": "1px solid #2a2f3a",
+                        },
+                        className="dark-dropdown",
+                    ),
+                ], style={**CUSTOM_CARD, "marginBottom": "10px"}),
+                dcc.Graph(id="treemap", style={"height": "560px", "width": "100%"}),
+            ], style={"flex": "1 1 800px", "minWidth": "600px"}),
 
+            # Right: 3 education selectors
             html.Div([
-                html.Div("Vælg op til 3 uddannelser:", style={"marginBottom":"8px", "fontWeight":"600"}),
-                dcc.Dropdown(titles_options, id="edu1", placeholder="Uddannelse A", clearable=True,
-                             style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
-                dcc.Dropdown(titles_options, id="edu2", placeholder="Uddannelse B", clearable=True,
-                             style={"marginBottom":"10px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
-                dcc.Dropdown(titles_options, id="edu3", placeholder="Uddannelse C", clearable=True,
-                             style={"backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a"}),
-                html.Div("Tip: Radar viser rå Likert (1–5). Løn/ledighed i søjlerne til højre.",
-                         style={"marginTop":"12px","color":"#9aa4b2","fontSize":"12px"})
-            ], style={"flex":"0 0 360px","maxWidth":"360px", **CUSTOM_CARD})
-        ], style={"display":"flex","gap":"16px","alignItems":"flex-start","flexWrap":"wrap"}),
+                html.Div("Vælg op til 3 uddannelser:", style={"marginBottom": "8px", "fontWeight": "600"}),
+                dcc.Dropdown(
+                    titles_options,
+                    id="edu1",
+                    placeholder="Uddannelse A",
+                    clearable=True,
+                    style={
+                        "marginBottom": "10px",
+                        "backgroundColor": "#1f2630",
+                        "color": FONT_COL,
+                        "border": "1px solid #2a2f3a",
+                    },
+                    className="dark-dropdown",
+                ),
+                dcc.Dropdown(
+                    titles_options,
+                    id="edu2",
+                    placeholder="Uddannelse B",
+                    clearable=True,
+                    style={
+                        "marginBottom": "10px",
+                        "backgroundColor": "#1f2630",
+                        "color": FONT_COL,
+                        "border": "1px solid #2a2f3a",
+                    },
+                    className="dark-dropdown",
+                ),
+                dcc.Dropdown(
+                    titles_options,
+                    id="edu3",
+                    placeholder="Uddannelse C",
+                    clearable=True,
+                    style={
+                        "backgroundColor": "#1f2630",
+                        "color": FONT_COL,
+                        "border": "1px solid #2a2f3a",
+                    },
+                    className="dark-dropdown",
+                ),
+                html.Div(
+                    "Tip: Radar viser rå Likert (1–5). Løn/ledighed i søjlerne til højre.",
+                    style={"marginTop": "12px", "color": FONT_COL, "fontSize": "12px"},
+                ),
+            ], style={"flex": "0 0 360px", "maxWidth": "360px", **CUSTOM_CARD}),
+        ], style={"display": "flex", "gap": "16px", "alignItems": "flex-start", "flexWrap": "wrap"}),
 
-        html.Hr(style={"borderColor":"#2a2f3a"}),
+        html.Hr(style={"borderColor": "#2a2f3a"}),
 
         # Radar + KPI
         html.Div([
-            html.Div([ dcc.Graph(id="radar", style={"height":"560px"}) ],
-                     style={"flex":"3 1 0px","minWidth":"520px"}),
+            html.Div([dcc.Graph(id="radar", style={"height": "560px"})],
+                     style={"flex": "3 1 0px", "minWidth": "520px"}),
             html.Div([
-                html.Div(id="bachelor_notice", style={**CUSTOM_CARD,"display":"none","marginBottom":"8px"}),
-                dcc.Graph(id="bar_afbrud",   style={"height":"200px","marginBottom":"10px"}),
-                dcc.Graph(id="bar_ledighed", style={"height":"200px","marginBottom":"10px"}),
-                dcc.Graph(id="bar_loen_ny",  style={"height":"200px"})
-            ], style={"flex":"2 1 0px", **CUSTOM_CARD})
-        ], style={"display":"flex","gap":"16px","alignItems":"stretch","flexWrap":"wrap"}),
+                html.Div(id="bachelor_notice",
+                         style={**CUSTOM_CARD, "display": "none", "marginBottom": "8px"}),
+                dcc.Graph(id="bar_afbrud",   style={"height": "200px", "marginBottom": "10px"}),
+                dcc.Graph(id="bar_ledighed", style={"height": "200px", "marginBottom": "10px"}),
+                dcc.Graph(id="bar_loen_ny",  style={"height": "200px"}),
+            ], style={"flex": "2 1 0px", **CUSTOM_CARD}),
+        ], style={"display": "flex", "gap": "16px", "alignItems": "stretch", "flexWrap": "wrap"}),
 
-        html.Hr(style={"borderColor":"#2a2f3a"}),
+        html.Hr(style={"borderColor": "#2a2f3a"}),
 
         # Multi-bachelor exploration (bar + SANKEY)
         html.Div("Udforsk kandidat-retninger (vælg flere bachelorer)",
-                 style={"fontWeight":"600","marginBottom":"6px"}),
+                 style={"fontWeight": "600", "marginBottom": "6px"}),
         dcc.Dropdown(
-            options=[{"label":t, "value":t} for t in bachelor_titles_multi],
+            options=[{"label": t, "value": t} for t in bachelor_titles_multi],
             id="bachelor_multi",
             placeholder="Vælg en eller flere bacheloruddannelser",
-            multi=True, clearable=True,
-            style={"maxWidth":"900px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a","marginBottom":"12px"}
+            multi=True,
+            clearable=True,
+            style={
+                "maxWidth": "900px",
+                "backgroundColor": "#1f2630",
+                "color": FONT_COL,
+                "border": "1px solid #2a2f3a",
+                "marginBottom": "12px",
+            },
+            className="dark-dropdown",
         ),
         html.Div([
-            html.Div([ dcc.Graph(id="kandidat_bar", style={"height":"480px"}) ],
-                     style={"flex":"1 1 520px","minWidth":"420px"}),
-            html.Div([ dcc.Graph(id="kandidat_flow", style={"height":"480px"}) ],
-                     style={"flex":"1 1 520px","minWidth":"420px"}),
-        ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
+            html.Div([dcc.Graph(id="kandidat_bar", style={"height": "480px"})],
+                     style={"flex": "1 1 520px", "minWidth": "420px"}),
+            html.Div([dcc.Graph(id="kandidat_flow", style={"height": "480px"})],
+                     style={"flex": "1 1 520px", "minWidth": "420px"}),
+        ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
 
         # --- Detail panel ---
-        html.Hr(style={"borderColor":"#2a2f3a"}),
+        html.Hr(style={"borderColor": "#2a2f3a"}),
         html.Div("Detaljer for valgt uddannelse (udbydere + info)",
-                 style={"fontWeight":"600","marginBottom":"6px"}),
+                 style={"fontWeight": "600", "marginBottom": "6px"}),
         dcc.Dropdown(
             options=AVAILABLE_OPTIONS,
             id="detail_select",
             placeholder="Vælg uddannelse (ikke nationalt niveau)",
             clearable=True,
-            style={"maxWidth":"900px","backgroundColor":"#1f2630","color":FONT_COL,"border":"1px solid #2a2f3a","marginBottom":"12px"}
+            style={
+                "maxWidth": "900px",
+                "backgroundColor": "#1f2630",
+                "color": FONT_COL,
+                "border": "1px solid #2a2f3a",
+                "marginBottom": "12px",
+            },
+            className="dark-dropdown",
         ),
         html.Div([
-            html.Div(id="detail_table", style={"flex":"1 1 520px","minWidth":"420px","padding":"8px",
-                                              "backgroundColor":"#11151b","border":"1px solid #2a2f3a","borderRadius":"8px"}),
-            html.Div([ dcc.Graph(id="detail_map", style={"height":"520px"}) ],
-                     style={"flex":"1 1 520px","minWidth":"420px"}),
-        ], style={"display":"flex","gap":"16px","flexWrap":"wrap"}),
+            html.Div(
+                id="detail_table",
+                style={
+                    "flex": "1 1 520px",
+                    "minWidth": "420px",
+                    "padding": "8px",
+                    "backgroundColor": "#11151b",
+                    "border": "1px solid #2a2f3a",
+                    "borderRadius": "8px",
+                    "color": FONT_COL,
+                },
+            ),
+            html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})],
+                     style={"flex": "1 1 520px", "minWidth": "420px"}),
+        ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
     ]
 )
+
 
 # ---------- Callbacks ----------
 @app.callback(
@@ -673,7 +767,8 @@ def update_main(a, b, c):
                 + ", ".join(notice_titles)
                 + ". Yderligere uddannelse (kandidat) kan være nødvendig. "
                   "Brug værktøjet nedenfor til at se relevante kandidatuddannelser.",
-                style={"lineHeight":"1.5"})
+                style={"lineHeight":"1.5"}
+            )
         ])
         style = {**CUSTOM_CARD, "display":"block", "borderLeft":"4px solid #4C9BE8"}
     else:
@@ -731,9 +826,12 @@ def update_multi_charts(selected):
 )
 def update_detail_panel(edu_title):
     if not edu_title or edu_title not in AVAILABLE_SET:
-        empty_table = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color":"#9aa4b2"})
+        empty_table = html.Div(
+            "Vælg en uddannelse ovenfor for at se detaljer.",
+            style={"color":FONT_COL}
+        )
         empty_fig = go.Figure()
-        empty_fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG)
+        empty_fig.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
         return empty_table, empty_fig
     table, providers_small = build_detail_table(df_raw, edu_title)
     map_fig = build_providers_map(providers_small)
