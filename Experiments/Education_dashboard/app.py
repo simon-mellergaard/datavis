@@ -48,6 +48,53 @@ data = load_data()
 ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / "assets"
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
 
+
+def render_selection_rows(values):
+    rows = []
+    visible_index = 1
+    for idx, value in enumerate(values, start=1):
+        has_value = bool(value)
+        label = f"{visible_index}. {value}" if has_value else ""
+        if has_value:
+            visible_index += 1
+        rows.append(
+            html.Div(
+                [
+                    html.Span(label, style={"flex": "1"}),
+                    html.Button(
+                        "Fjern",
+                        id=f"remove_edu{idx}",
+                        n_clicks=0,
+                        style={
+                            "backgroundColor": "#b02a37",
+                            "color": "#fff",
+                            "border": "none",
+                            "padding": "4px 10px",
+                            "borderRadius": "4px",
+                            "cursor": "pointer",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex" if has_value else "none",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "marginBottom": "6px",
+                },
+            )
+        )
+
+    if visible_index == 1:
+        rows.insert(
+            0,
+            html.Div(
+                "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
+                style={"color": "#adb5c6", "marginBottom": "6px"},
+            ),
+        )
+
+    return rows
+
 titles_options = [{"label": t, "value": t} for t in data.available_titles]
 parcoord_available = [c for c in PARCOORD_VARIABLES if c in data.df.columns]
 parcoord_default = [c for c in PARCOORD_DEFAULT_VARS if c in parcoord_available] or parcoord_available[:5]
@@ -97,7 +144,11 @@ app.layout = html.Div(
                         html.Div(
                             [
                                 html.Div("Valgte uddannelser:", style={"fontWeight": "600", "marginBottom": "6px"}),
-                                html.Div(id="selection_summary_text", style={"marginBottom": "10px", "lineHeight": "1.5"}),
+                                html.Div(
+                                    render_selection_rows([None, None, None]),
+                                    id="selection_summary_text",
+                                    style={"marginBottom": "10px", "lineHeight": "1.5"},
+                                ),
                                 html.Button(
                                     "Ryd valg",
                                     id="clear_selections",
@@ -315,13 +366,16 @@ def toggle_treemap_modal(click_data, confirm_clicks, cancel_clicks, pending):
     Output("edu3", "value"),
     Input("treemap_confirm", "n_clicks"),
     Input("clear_selections", "n_clicks"),
+    Input("remove_edu1", "n_clicks"),
+    Input("remove_edu2", "n_clicks"),
+    Input("remove_edu3", "n_clicks"),
     State("treemap_pending", "data"),
     State("edu1", "value"),
     State("edu2", "value"),
     State("edu3", "value"),
     prevent_initial_call=True,
 )
-def modify_selections(confirm_clicks, clear_clicks, pending, v1, v2, v3):
+def modify_selections(confirm_clicks, clear_clicks, rem1, rem2, rem3, pending, v1, v2, v3):
     ctx = callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -329,6 +383,13 @@ def modify_selections(confirm_clicks, clear_clicks, pending, v1, v2, v3):
 
     if trigger == "clear_selections":
         return None, None, None
+
+    if trigger.startswith("remove_edu"):
+        idx = int(trigger.replace("remove_edu", "")) - 1
+        slots = [v1, v2, v3]
+        slots.pop(idx)
+        slots.append(None)
+        return slots[0], slots[1], slots[2]
 
     if trigger == "treemap_confirm":
         if not confirm_clicks or not pending or pending not in data.available_set:
@@ -351,13 +412,7 @@ def modify_selections(confirm_clicks, clear_clicks, pending, v1, v2, v3):
 
 @app.callback(Output("selection_summary_text", "children"), Input("edu1", "value"), Input("edu2", "value"), Input("edu3", "value"))
 def update_selection_summary(a, b, c):
-    selected = [t for t in [a, b, c] if t]
-    if not selected:
-        return html.Div(
-            "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
-            style={"color": "#adb5c6"},
-        )
-    return html.Div([html.Div(f"{idx + 1}. {title}") for idx, title in enumerate(selected)])
+    return render_selection_rows([a, b, c])
 
 
 @app.callback(
