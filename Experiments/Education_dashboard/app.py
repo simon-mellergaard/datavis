@@ -148,16 +148,24 @@ app.layout = html.Div(
                             className="dark-dropdown",
                         ),
                         html.Div(id="parcoord_legend", style={"marginBottom": "12px"}),
-                        dcc.Graph(id="parallel_plot", style={"height": "560px"}),
+                        html.Iframe(
+                            id="parallel_plot",
+                            style={
+                                "width": "100%",
+                                "height": "640px",  #Change Parallel coordinates plot size here 
+                                "border": "0",
+                                "backgroundColor": "#0f1115",
+                            },
+                        ),
                     ],
-                    style={"flex": "3 1 0px", "minWidth": "520px", **CUSTOM_CARD},
+                    style={"flex": "4 1 0px", "minWidth": "620px", **CUSTOM_CARD},
                 ),
                 html.Div(
                     [
                         html.Div("Filtrer med intervaller:", style={"fontWeight": "600", "marginBottom": "6px"}),
-                        html.Div(id="parcoord_sliders", style={"maxHeight": "520px", "overflowY": "auto"}),
+                        html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
                     ],
-                    style={"flex": "1 1 260px", "minWidth": "260px", **CUSTOM_CARD},
+                    style={"flex": "1 1 220px", "minWidth": "220px", **CUSTOM_CARD},
                 ),
             ],
             style={"display": "flex", "gap": "16px", "alignItems": "stretch", "flexWrap": "wrap"},
@@ -353,7 +361,7 @@ def update_selection_summary(a, b, c):
 
 
 @app.callback(
-    Output("parallel_plot", "figure"),
+    Output("parallel_plot", "srcDoc"),
     Output("parcoord_sliders", "children"),
     Output("parcoord_color_store", "data"),
     Output("parcoord_legend", "children"),
@@ -378,9 +386,9 @@ def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, slider_ids, c
     slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values)
     selected_titles = [t for t in [e1, e2, e3] if t]
     color_map = build_color_map_for_selected(selected_titles, color_store)
-    figure = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map)
+    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map)
     legend = build_parcoord_legend(selected_titles, color_map)
-    return figure, slider_components, color_map, legend
+    return figure_html, slider_components, color_map, legend
 
 
 @app.callback(Output("kandidat_bar", "figure"), Output("kandidat_flow", "figure"), Input("bachelor_multi", "value"))

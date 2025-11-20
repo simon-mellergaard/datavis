@@ -7,6 +7,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
+from bokeh.embed import file_html
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.plotting import figure
+from bokeh.resources import CDN
 
 from .helpers import (
     ensure_latlon_from_municipality,
@@ -700,124 +704,133 @@ def build_parallel_coordinates(
     slider_filter: Dict[str, Sequence[float]],
     selected_vars: Iterable[str],
     color_map: Dict[str, str],
-) -> go.Figure:
+) -> str:
     df = data.df.copy().dropna(subset=["titel"])
     columns = [col for col in selected_vars if col in df.columns]
     if not columns:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="Ingen variabler valgt til parallelkoordinater.",
-            showarrow=False,
-            font=dict(color=FONT_COL),
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-        )
-        fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
-            font_color=FONT_COL,
-            margin=dict(t=20, l=20, r=20, b=20),
-            height=560,
-        )
-        return fig
+        return "<div style='color:#fff;padding:16px'>Ingen variabler valgt.</div>"
 
     df = df.dropna(subset=columns)
     if df.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="Ingen data til de valgte variabler.",
-            showarrow=False,
-            font=dict(color=FONT_COL),
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-        )
-        fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
-            font_color=FONT_COL,
-            margin=dict(t=20, l=20, r=20, b=20),
-            height=560,
-        )
-        return fig
+        return "<div style='color:#fff;padding:16px'>Ingen data for de valgte variabler.</div>"
+
     selected_list = [t for t in selected_titles if t]
-    slider_active = bool(slider_filter)
-    numeric_line_values: List[float] = []
-    for _, row in df.iterrows():
-        title = row["titel"]
-        if title in selected_list:
-            numeric_line_values.append(selected_list.index(title) + 1)
-            continue
-        if slider_active:
-            matches = True
-            for col, (low, high) in slider_filter.items():
-                if col not in row or pd.isna(row[col]):
-                    matches = False
-                    break
-                value = float(row[col])
-                if value < low or value > high:
-                    matches = False
-                    break
-            numeric_line_values.append(0.5 if matches else 0.0)
-        else:
-            numeric_line_values.append(0.0)
+    slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
-    dimensions = []
+    axis_ranges: Dict[str, Tuple[float, float]] = {}
     for col in columns:
-        values = df[col].astype(float)
         if col in PARCOORD_LIKERT_COLUMNS:
-            dim_range = [1, 5]
+            axis_ranges[col] = (2.0, 5.0)
         else:
-            dim_range = [float(values.min()), float(values.max())]
-            if np.isclose(dim_range[0], dim_range[1]):
-                dim_range[1] = dim_range[0] + 1.0
-        dimension = dict(
-            range=dim_range,
-            label=PARCOORD_LABELS.get(col, col),
-            values=values,
-        )
-        if col in slider_filter:
-            dimension["constraintrange"] = slider_filter[col]
-        dimensions.append(dimension)
+            series = df[col].astype(float)
+            vmin = float(series.min())
+            vmax = float(series.max())
+            if np.isclose(vmin, vmax):
+                vmax = vmin + 1.0
+            axis_ranges[col] = (vmin, vmax)
 
-    count_selected = len(selected_list)
-    cmin = 0.0
-    cmax = max(1.0, float(count_selected) or 1.0)
-    colorscale: List[List[float | str]] = [[0.0, "#E8E8E8"], [1.0, "#E8E8E8"]]
-    if slider_active:
-        colorscale.insert(1, [0.5 / cmax, "#87CEFA"])
-    if count_selected:
-        for idx, title in enumerate(selected_list, start=1):
-            pos = float(idx) / cmax
-            colorscale.insert(-1, [pos, color_map.get(title, "#E8E8E8")])
+    def normalize(value: float, bounds: Tuple[float, float]) -> float:
+        lo, hi = bounds
+        span = max(hi - lo, 1e-9)
+        return float(np.clip((value - lo) / span, 0.0, 1.0))
 
-    fig = go.Figure(
-        go.Parcoords(
-            line=dict(
-                color=numeric_line_values,
-                colorscale=colorscale,
-                cmin=cmin,
-                cmax=cmax,
-                showscale=False,
-            ),
-            dimensions=dimensions,
-            ids=df["titel"].astype(str),
+    def row_values(row):
+        return {col: normalize(float(row[col]), axis_ranges[col]) for col in columns}
+
+    def matches_slider(row):
+        if not slider_filter:
+            return False
+        for col, (lo, hi) in slider_filter.items():
+            val = row.get(col)
+            if pd.isna(val) or val < lo or val > hi:
+                return False
+        return True
+
+    xs_template = list(range(len(columns)))
+    base_xs: List[List[int]] = []
+    base_ys: List[List[float]] = []
+    base_titles: List[str] = []
+    filtered_xs: List[List[int]] = []
+    filtered_ys: List[List[float]] = []
+    filtered_titles: List[str] = []
+    selected_xs: List[List[int]] = []
+    selected_ys: List[List[float]] = []
+    selected_colors: List[str] = []
+    selected_titles_list: List[str] = []
+    selected_values_list: List[List[float]] = []
+
+    for _, row in df.iterrows():
+        title = str(row["titel"])
+        norm_map = row_values(row)
+        values = [norm_map[col] for col in columns]
+        if title in selected_list:
+            selected_xs.append(xs_template[:])
+            selected_ys.append(values)
+            selected_colors.append(color_map.get(title, "#ff6b6b"))
+            selected_titles_list.append(title)
+            selected_values_list.append([float(row[col]) for col in columns])
+        elif matches_slider(row):
+            filtered_xs.append(xs_template[:])
+            filtered_ys.append(values)
+            filtered_titles.append(title)
+        else:
+            base_xs.append(xs_template[:])
+            base_ys.append(values)
+            base_titles.append(title)
+
+    p = figure(
+        height=640,
+        sizing_mode="stretch_width",
+        x_range=(-0.5, len(columns) - 0.5),
+        y_range=(0, 1),
+        toolbar_location=None,
+        background_fill_color=CUSTOM_BG,
+        border_fill_color=CUSTOM_BG,
+    )
+    p.grid.visible = False
+    p.yaxis.visible = False
+    p.xaxis.ticker = list(range(len(columns)))
+    p.xaxis.major_label_overrides = {i: PARCOORD_LABELS.get(col, col) for i, col in enumerate(columns)}
+    p.xaxis.major_label_text_color = FONT_COL
+    p.xaxis.major_tick_line_color = "#2a2f3a"
+    p.xaxis.axis_line_color = "#2a2f3a"
+
+    for idx, col in enumerate(columns):
+        p.segment(x0=idx, y0=0, x1=idx, y1=1, line_color="#2a2f3a", line_alpha=0.4)
+        lo, hi = axis_ranges[col]
+        p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=FONT_COL, text_font_size="10px")
+        p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=FONT_COL, text_font_size="10px")
+
+    hover_renderers = []
+    if base_xs:
+        source = ColumnDataSource(dict(xs=base_xs, ys=base_ys, title=base_titles))
+        p.multi_line("xs", "ys", source=source, line_color="#6c757d", line_alpha=0.18, line_width=1)
+    if filtered_xs:
+        source = ColumnDataSource(dict(xs=filtered_xs, ys=filtered_ys, title=filtered_titles))
+        p.multi_line("xs", "ys", source=source, line_color="#4dabf7", line_alpha=0.7, line_width=1.5)
+    if selected_xs:
+        tooltip_texts = []
+        for value_list in selected_values_list:
+            lines = [f"{PARCOORD_LABELS.get(col, col)}: {val:.2f}" for col, val in zip(columns, value_list)]
+            tooltip_texts.append("\n".join(lines))
+        source = ColumnDataSource(
+            dict(xs=selected_xs, ys=selected_ys, title=selected_titles_list, color=selected_colors, details=tooltip_texts)
         )
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
-        margin=dict(t=30, l=40, r=20, b=30),
-        height=560,
-    )
-    return fig
+        r = p.multi_line("xs", "ys", source=source, line_color="color", line_alpha=0.95, line_width=3)
+        hover_renderers.append(r)
+
+    if hover_renderers:
+        hover = HoverTool(
+            tooltips="""
+            <div><b>Uddannelse:</b> @title</div>
+            <div style="white-space:pre-line;">@details</div>
+            """,
+            renderers=hover_renderers,
+            line_policy="nearest",
+        )
+        p.add_tools(hover)
+
+    return file_html(p, CDN, "Parallel Coordinates")
 
 
 def build_parcoord_sliders(
