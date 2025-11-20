@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Iterable, Sequence, Tuple, TYPE_CHECKING
+from typing import Dict, Iterable, List, Sequence, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import html
+from dash import dcc, html
 
 from .helpers import (
     ensure_latlon_from_municipality,
@@ -46,93 +46,68 @@ DETAIL_GROUPS = {
 }
 DETAIL_NUMERIC = ["kvote_1_kvotient", "standby_8"]
 
+PARCOORD_VARIABLES = [
+    "fagligmiljo_likert",
+    "arbmedstud_likert",
+    "medstuderende_likert",
+    "udbytte_undervisning_likert",
+    "socialtmiljo_likert",
+    "ensom_likert",
+    "stress_daglig_likert",
+    "tilpas_likert",
+    "undervisere_engagerede_likert",
+    "undervisere_feedback_likert",
+    "undervisere_hjaelp_likert",
+    "undervisere_kontakt_likert",
+    "afbrud",
+    "tidsforbrug_p50",
+    "tidsforbrug_arbejde",
+    "arbejdstid_timer",
+    "ledighed_nyudd",
+    "maanedloen_nyudd",
+    "maanedloen_10aar",
+]
+PARCOORD_DEFAULT_VARS = PARCOORD_VARIABLES[:5]
+PARCOORD_LIKERT_COLUMNS = {
+    "fagligmiljo_likert",
+    "arbmedstud_likert",
+    "medstuderende_likert",
+    "udbytte_undervisning_likert",
+    "socialtmiljo_likert",
+    "ensom_likert",
+    "stress_daglig_likert",
+    "tilpas_likert",
+    "undervisere_engagerede_likert",
+    "undervisere_feedback_likert",
+    "undervisere_hjaelp_likert",
+    "undervisere_kontakt_likert",
+}
+PARCOORD_LABELS: Dict[str, str] = {
+    "fagligmiljo_likert": "Fagligt miljø",
+    "arbmedstud_likert": "Arbejde med studier",
+    "medstuderende_likert": "Medstuderende",
+    "udbytte_undervisning_likert": "Udbytte af undervisning",
+    "socialtmiljo_likert": "Socialt miljø",
+    "ensom_likert": "Ensomhed",
+    "stress_daglig_likert": "Stress",
+    "tilpas_likert": "Trives",
+    "undervisere_engagerede_likert": "Undervisere engagerede",
+    "undervisere_feedback_likert": "Feedback",
+    "undervisere_hjaelp_likert": "Hjælp fra undervisere",
+    "undervisere_kontakt_likert": "Kontakt til undervisere",
+    "afbrud": "Afbrud (%)",
+    "tidsforbrug_p50": "Tidsforbrug (timer)",
+    "tidsforbrug_arbejde": "Tidsforbrug arbejde",
+    "arbejdstid_timer": "Arbejdstid (timer)",
+    "ledighed_nyudd": "Ledighed nyudd.",
+    "maanedloen_nyudd": "Løn (nyudd.)",
+    "maanedloen_10aar": "Løn (10 år)",
+}
+
 
 def bar_colors(n: int) -> Sequence[str]:
     steps = [i / (n - 1) if n > 1 else 0 for i in range(max(n, 1))]
     return px.colors.sample_colorscale(px.colors.sequential.Blues_r, steps)
-
-
-def build_simple_bar(
-    data: DataBundle,
-    metric: str,
-    titles: Iterable[str],
-    title_txt: str,
-    tickprefix: str = "",
-) -> go.Figure:
-    selected = [t for t in titles if t in data.available_set]
-    subset = data.df[data.df["titel"].isin(selected)]
-    fig = go.Figure()
-
-    if not subset.empty and metric in subset.columns:
-        colors = bar_colors(len(subset))
-        fig.add_trace(
-            go.Bar(
-                x=subset["titel"],
-                y=subset[metric],
-                marker=dict(color=colors),
-                hovertemplate="<b>%{x}</b><br>"
-                + title_txt
-                + ": %{y:.2f}<extra></extra>",
-            )
-        )
-
-    fig.update_layout(
-        title=title_txt,
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
-        margin=dict(t=40, l=40, r=20, b=70),
-        xaxis=dict(tickangle=20),
-        yaxis=dict(tickprefix=tickprefix),
-    )
-    return fig
-
-
-def build_radar_raw(data: DataBundle, titles: Iterable[str]) -> go.Figure:
-    fig = go.Figure()
-    theta = [lbl for _, lbl in data.radar_vars]
-    theta_closed = theta + [theta[0]]
-
-    for title in titles:
-        row = data.df[data.df["titel"] == title]
-        if row.empty:
-            continue
-        values = []
-        for col, _label in data.radar_vars:
-            value = row[col].iloc[0] if col in row.columns else np.nan
-            values.append(0.0 if pd.isna(value) else float(value))
-        values_closed = values + [values[0]]
-        fig.add_trace(
-            go.Scatterpolar(
-                r=values_closed,
-                theta=theta_closed,
-                mode="lines+markers",
-                name=title,
-                fill="toself",
-            )
-        )
-
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
-        title="Radar (rå Likert-værdier)",
-        polar=dict(
-            bgcolor="#12151c",
-            radialaxis=dict(
-                visible=True,
-                range=list(data.radar_bounds),
-                tickvals=[1, 2, 3, 4, 5],
-                gridcolor="#2a2f3a",
-            ),
-            angularaxis=dict(gridcolor="#2a2f3a"),
-        ),
-        legend=dict(orientation="v", x=1.02, xanchor="left", y=1),
-        margin=dict(t=40, l=30, r=30, b=30),
-    )
-    return fig
 
 
 def build_flow_df(data: DataBundle, selected_bachelors: Iterable[str]) -> pd.DataFrame:
@@ -610,7 +585,7 @@ def build_city_treemap(
         color_values[selected_mask] = min_val
 
         grey_break = min(max(epsilon / span, 1e-4), 0.05)
-        scaled = [[0.0, "#ff00b3"], [grey_break, "#ff00b3"]] #CHANGE COLOR HERE
+        scaled = [[0.0, "#6c757d"], [grey_break, "#6c757d"]]
         blues = px.colors.sequential.Blues
         if len(blues) == 1:
             scaled.append([1.0, blues[0]])
@@ -665,3 +640,172 @@ def build_city_treemap(
     )
     fig.update_traces(root_color="#1c1f26")
     return fig
+
+
+def build_parallel_coordinates(
+    data: DataBundle,
+    selected_titles: Iterable[str],
+    slider_filter: Dict[str, Sequence[float]],
+    selected_vars: Iterable[str],
+) -> go.Figure:
+    df = data.df.copy().dropna(subset=["titel"])
+    columns = [col for col in selected_vars if col in df.columns]
+    if not columns:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Ingen variabler valgt til parallelkoordinater.",
+            showarrow=False,
+            font=dict(color=FONT_COL),
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor=CUSTOM_BG,
+            plot_bgcolor=PLOT_BG,
+            font_color=FONT_COL,
+            margin=dict(t=20, l=20, r=20, b=20),
+            height=560,
+        )
+        return fig
+
+    df = df.dropna(subset=columns)
+    if df.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Ingen data til de valgte variabler.",
+            showarrow=False,
+            font=dict(color=FONT_COL),
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor=CUSTOM_BG,
+            plot_bgcolor=PLOT_BG,
+            font_color=FONT_COL,
+            margin=dict(t=20, l=20, r=20, b=20),
+            height=560,
+        )
+        return fig
+    highlight_set = {t for t in selected_titles if t}
+
+    line_colors: List[float] = []
+    for _, row in df.iterrows():
+        title = row["titel"]
+        if title in highlight_set:
+            line_colors.append(1.0)
+            continue
+        if slider_filter:
+            matches = True
+            for col, (low, high) in slider_filter.items():
+                if col not in row or pd.isna(row[col]):
+                    matches = False
+                    break
+                value = float(row[col])
+                if value < low or value > high:
+                    matches = False
+                    break
+            line_colors.append(0.6 if matches else 0.1)
+        else:
+            line_colors.append(0.1)
+
+    if not line_colors:
+        line_colors = [0.1] * len(df)
+
+    dimensions = []
+    for col in columns:
+        values = df[col].astype(float)
+        if col in PARCOORD_LIKERT_COLUMNS:
+            dim_range = [1, 5]
+        else:
+            dim_range = [float(values.min()), float(values.max())]
+            if np.isclose(dim_range[0], dim_range[1]):
+                dim_range[1] = dim_range[0] + 1.0
+        dimension = dict(
+            range=dim_range,
+            label=PARCOORD_LABELS.get(col, col),
+            values=values,
+        )
+        if col in slider_filter:
+            dimension["constraintrange"] = slider_filter[col]
+        dimensions.append(dimension)
+
+    fig = go.Figure(
+        go.Parcoords(
+            line=dict(
+                color=line_colors,
+                colorscale=[[0, "#6c757d"], [0.6, "#4dabf7"], [1.0, "#ff6b6b"]],
+                cmin=0,
+                cmax=1,
+                showscale=False,
+            ),
+            dimensions=dimensions,
+            ids=df["titel"].astype(str),
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor=CUSTOM_BG,
+        plot_bgcolor=PLOT_BG,
+        font_color=FONT_COL,
+        margin=dict(t=30, l=40, r=20, b=30),
+        height=560,
+    )
+    return fig
+
+
+def build_parcoord_sliders(
+    data: DataBundle,
+    selected_vars: Iterable[str],
+    previous_values: Dict[str, Sequence[float]],
+) -> Tuple[List[html.Div], Dict[str, Sequence[float]]]:
+    components: List[html.Div] = []
+    slider_filter: Dict[str, Sequence[float]] = {}
+    df = data.df
+
+    for col in selected_vars:
+        if col not in df.columns:
+            continue
+        if col in PARCOORD_LIKERT_COLUMNS:
+            min_val, max_val = 1.0, 5.0
+            step = 0.1
+            marks = {i: str(i) for i in range(1, 6)}
+            default = [1.0, 1.0]
+        else:
+            series = df[col].dropna().astype(float)
+            if series.empty:
+                continue
+            min_val = float(series.min())
+            max_val = float(series.max())
+            if np.isclose(min_val, max_val):
+                max_val = min_val + 1.0
+            step = max((max_val - min_val) / 50.0, 1e-2)
+            ticks = np.linspace(min_val, max_val, num=4)
+            marks = {float(f"{t:.0f}"): f"{t:.0f}" for t in ticks}
+            default = [min_val, min_val]
+
+        current = list(previous_values.get(col, default))
+        slider = dcc.RangeSlider(
+            id={"type": "parcoord-slider", "column": col},
+            min=min_val,
+            max=max_val,
+            step=step,
+            value=current,
+            marks=marks,
+            allowCross=False,
+        )
+        components.append(
+            html.Div(
+                [html.Label(PARCOORD_LABELS.get(col, col)), slider],
+                style={"marginBottom": "12px"},
+            )
+        )
+        if current[0] != current[1]:
+            slider_filter[col] = current
+
+    return components, slider_filter

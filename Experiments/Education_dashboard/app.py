@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from dash import (
     Dash,
+    ALL,
     Input,
     Output,
     State,
@@ -18,14 +19,17 @@ import plotly.graph_objects as go
 
 from .data_loader import load_data
 from .plots import (
+    PARCOORD_DEFAULT_VARS,
+    PARCOORD_LABELS,
+    PARCOORD_VARIABLES,
     bar_colors,
     build_city_treemap,
     build_detail_table,
     build_flow_df,
+    build_parcoord_sliders,
+    build_parallel_coordinates,
     build_providers_map,
-    build_radar_raw,
     build_sankey,
-    build_simple_bar,
 )
 from .theme import (
     CUSTOM_BG,
@@ -43,6 +47,9 @@ ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / 
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
 
 titles_options = [{"label": t, "value": t} for t in data.available_titles]
+parcoord_available = [c for c in PARCOORD_VARIABLES if c in data.df.columns]
+parcoord_default = [c for c in PARCOORD_DEFAULT_VARS if c in parcoord_available] or parcoord_available[:5]
+parcoord_options = [{"label": PARCOORD_LABELS.get(c, c), "value": c} for c in parcoord_available]
 
 app.layout = html.Div(
     style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
@@ -121,15 +128,38 @@ app.layout = html.Div(
         html.Hr(style={"borderColor": "#2a2f3a"}),
         html.Div(
             [
-                html.Div([dcc.Graph(id="radar", style={"height": "560px"})], style={"flex": "3 1 0px", "minWidth": "520px"}),
                 html.Div(
                     [
-                        html.Div(id="bachelor_notice", style={**CUSTOM_CARD, "display": "none", "marginBottom": "8px"}),
-                        dcc.Graph(id="bar_afbrud", style={"height": "200px", "marginBottom": "10px"}),
-                        dcc.Graph(id="bar_ledighed", style={"height": "200px", "marginBottom": "10px"}),
-                        dcc.Graph(id="bar_loen_ny", style={"height": "200px"}),
+                        html.Div("Vælg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        dcc.Dropdown(
+                            parcoord_options,
+                            id="parcoord_vars",
+                            value=parcoord_default,
+                            multi=True,
+                            placeholder="Vælg variabler",
+                            style={
+                                "marginBottom": "12px",
+                                "backgroundColor": "#1f2630",
+                                "color": FONT_COL,
+                                "border": "1px solid #2a2f3a",
+                            },
+                            className="dark-dropdown",
+                        ),
+                        dcc.Graph(id="parallel_plot", style={"height": "560px"}),
+                        html.Div(
+                            "Hold musen over linjerne for at se uddannelsesnavnet.",
+                            id="parcoord_hover_label",
+                            style={"marginTop": "8px", "fontStyle": "italic", "color": "#adb5c6"},
+                        ),
                     ],
-                    style={"flex": "2 1 0px", **CUSTOM_CARD},
+                    style={"flex": "3 1 0px", "minWidth": "520px", **CUSTOM_CARD},
+                ),
+                html.Div(
+                    [
+                        html.Div("Filtrer med intervaller:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div(id="parcoord_sliders", style={"maxHeight": "520px", "overflowY": "auto"}),
+                    ],
+                    style={"flex": "1 1 260px", "minWidth": "260px", **CUSTOM_CARD},
                 ),
             ],
             style={"display": "flex", "gap": "16px", "alignItems": "stretch", "flexWrap": "wrap"},
@@ -324,47 +354,36 @@ def update_selection_summary(a, b, c):
 
 
 @app.callback(
-    Output("radar", "figure"),
-    Output("bachelor_notice", "children"),
-    Output("bachelor_notice", "style"),
-    Output("bar_afbrud", "figure"),
-    Output("bar_ledighed", "figure"),
-    Output("bar_loen_ny", "figure"),
+    Output("parallel_plot", "figure"),
+    Output("parcoord_sliders", "children"),
+    Output("parcoord_hover_label", "children"),
+    Input("parcoord_vars", "value"),
     Input("edu1", "value"),
     Input("edu2", "value"),
     Input("edu3", "value"),
+    Input({"type": "parcoord-slider", "column": ALL}, "value"),
+    Input("parallel_plot", "hoverData"),
+    State({"type": "parcoord-slider", "column": ALL}, "id"),
 )
-def update_main(a, b, c):
-    selected = [x for x in [a, b, c] if x in data.available_set]
-    radar_fig = build_radar_raw(data, selected)
+def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, hover_data, slider_ids):
+    available = parcoord_available
+    chosen = [v for v in (selected_vars or parcoord_default) if v in available]
+    if not chosen:
+        chosen = available[:5]
 
-    notice_titles = []
-    for title in selected:
-        row = data.df[data.df["titel"] == title]
-        if not row.empty and str(row.iloc[0]["displaydocclass"]) == "Bacheloruddannelse":
-            notice_titles.append(title)
-    if notice_titles:
-        message = html.Div(
-            [
-                html.Div("Bemærk:", style={"fontWeight": "700", "marginBottom": "4px"}),
-                html.Div(
-                    "Du har valgt en universitets-bachelor: "
-                    + ", ".join(notice_titles)
-                    + ". Yderligere uddannelse (kandidat) kan være nødvendig. Brug værktøjet nedenfor til at se relevante kandidatuddannelser.",
-                    style={"lineHeight": "1.5"},
-                ),
-            ]
-        )
-        style = {**CUSTOM_CARD, "display": "block", "borderLeft": "4px solid #4C9BE8"}
-    else:
-        message = ""
-        style = {**CUSTOM_CARD, "display": "none"}
+    prev = {}
+    if slider_ids and slider_values:
+        prev = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
 
-    bar_afbrud = build_simple_bar(data, "afbrud", selected, "Afbrud (%)")
-    bar_ledighed = build_simple_bar(data, "ledighed_nyudd", selected, "Ledighed (nyudd.) (%)")
-    bar_loen_ny = build_simple_bar(data, "maanedloen_nyudd", selected, "Løn (nyudd.)", tickprefix="kr ")
-
-    return radar_fig, message, style, bar_afbrud, bar_ledighed, bar_loen_ny
+    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev)
+    selected_titles = [t for t in [e1, e2, e3] if t]
+    figure = build_parallel_coordinates(data, selected_titles, slider_filter, chosen)
+    hover_text = "Hold musen over linjerne for at se uddannelsesnavnet."
+    if hover_data and "points" in hover_data and hover_data["points"]:
+        label = hover_data["points"][0].get("id")
+        if label:
+            hover_text = f"Linje: {label}"
+    return figure, slider_components, hover_text
 
 
 @app.callback(Output("kandidat_bar", "figure"), Output("kandidat_flow", "figure"), Input("bachelor_multi", "value"))
