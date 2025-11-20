@@ -313,6 +313,7 @@ app.layout = html.Div(
             ],
         ),
         dcc.Store(id="parcoord_color_store", data={}),
+        dcc.Store(id="parcoord_filters_store", data={}),
     ],
 )
 
@@ -324,10 +325,12 @@ app.layout = html.Div(
     Input("edu1", "value"),
     Input("edu2", "value"),
     Input("edu3", "value"),
+    Input("parcoord_filters_store", "data"),
 )
-def update_treemap(city_value, metric_key, e1, e2, e3):
+def update_treemap(city_value, metric_key, e1, e2, e3, slider_filter):
     selected = [t for t in [e1, e2, e3] if t]
-    return build_city_treemap(data, city_value, metric_key, selected)
+    slider_filter = slider_filter or {}
+    return build_city_treemap(data, city_value, metric_key, selected, slider_filter)
 
 
 @app.callback(
@@ -419,6 +422,7 @@ def update_selection_summary(a, b, c):
     Output("parallel_plot", "srcDoc"),
     Output("parcoord_sliders", "children"),
     Output("parcoord_color_store", "data"),
+    Output("parcoord_filters_store", "data"),
     Output("parcoord_legend", "children"),
     Input("parcoord_vars", "value"),
     Input("edu1", "value"),
@@ -443,7 +447,7 @@ def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, slider_ids, c
     color_map = build_color_map_for_selected(selected_titles, color_store)
     figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map)
     legend = build_parcoord_legend(selected_titles, color_map)
-    return figure_html, slider_components, color_map, legend
+    return figure_html, slider_components, color_map, slider_filter, legend
 
 
 @app.callback(Output("kandidat_bar", "figure"), Output("kandidat_flow", "figure"), Input("bachelor_multi", "value"))

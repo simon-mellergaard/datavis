@@ -543,17 +543,43 @@ def build_city_treemap(
     city_value: str,
     metric_key: str,
     selected_titles: Iterable[str] | None = None,
+    slider_filter: Dict[str, Sequence[float]] | None = None,
 ) -> go.Figure:
     metric = data.size_metrics.get(metric_key)
     if not metric:
         metric_key = next(iter(data.size_metrics.keys()))
         metric = data.size_metrics[metric_key]
     metric_col, how, metric_label = metric
+    slider_filter = slider_filter or {}
+
+    allowed_titles: set[str] | None = None
+    if slider_filter:
+        df_base = data.df.dropna(subset=["titel"]).copy()
+        if not df_base.empty:
+            mask = pd.Series(True, index=df_base.index, dtype=bool)
+            for col, bounds in slider_filter.items():
+                if col not in df_base.columns:
+                    continue
+                if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+                    continue
+                try:
+                    lo = float(bounds[0])
+                    hi = float(bounds[1])
+                except (TypeError, ValueError):
+                    continue
+                series = pd.to_numeric(df_base[col], errors="coerce")
+                mask &= series.between(lo, hi)
+            allowed_titles = set(df_base.loc[mask, "titel"].astype(str).str.strip())
+            allowed_titles &= data.available_set
+        else:
+            allowed_titles = set()
 
     if city_value and city_value != "__ALL__":
         df_sel = data.df_prov[data.df_prov["instkommunetx"] == city_value].copy()
     else:
         df_sel = data.df_prov.copy()
+    if allowed_titles is not None:
+        df_sel = df_sel[df_sel["titel"].isin(allowed_titles)]
 
     df_sel = df_sel.dropna(subset=["educational_category", "cluster_label", "titel"])
     df_sel = df_sel[~df_sel[metric_col].isna()]

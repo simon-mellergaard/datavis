@@ -225,6 +225,8 @@ def load_data(
     available_options = [{"label": t, "value": t} for t in available_titles]
     available_set = set(available_titles)
 
+    df = df[df["titel"].isin(available_set)].copy()
+
     bachelor_titles = sorted(
         set(
             df.loc[
