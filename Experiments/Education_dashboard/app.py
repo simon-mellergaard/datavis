@@ -229,9 +229,17 @@ app.layout = html.Div(
 )
 
 
-@app.callback(Output("treemap", "figure"), Input("city_select", "value"), Input("size_metric", "value"))
-def update_treemap(city_value, metric_key):
-    return build_city_treemap(data, city_value, metric_key)
+@app.callback(
+    Output("treemap", "figure"),
+    Input("city_select", "value"),
+    Input("size_metric", "value"),
+    Input("edu1", "value"),
+    Input("edu2", "value"),
+    Input("edu3", "value"),
+)
+def update_treemap(city_value, metric_key, e1, e2, e3):
+    selected = [t for t in [e1, e2, e3] if t]
+    return build_city_treemap(data, city_value, metric_key, selected)
 
 
 @app.callback(

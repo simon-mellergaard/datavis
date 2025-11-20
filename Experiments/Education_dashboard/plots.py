@@ -501,12 +501,18 @@ def build_hierarchical_dataframe(
             out=np.zeros(len(values), dtype=float),
             where=counts != 0,
         )
+        df_tree["level"] = level
         frames.append(df_tree)
 
     return pd.concat(frames, ignore_index=True)
 
 
-def build_city_treemap(data: DataBundle, city_value: str, metric_key: str) -> go.Figure:
+def build_city_treemap(
+    data: DataBundle,
+    city_value: str,
+    metric_key: str,
+    selected_titles: Iterable[str] | None = None,
+) -> go.Figure:
     metric = data.size_metrics.get(metric_key)
     if not metric:
         metric_key = next(iter(data.size_metrics.keys()))
@@ -577,19 +583,61 @@ def build_city_treemap(data: DataBundle, city_value: str, metric_key: str) -> go
         )
         return fig
 
-    title_txt = f"{metric_label} — " + (city_value if city_value != "__ALL__" else "Alle kommuner")
+    title_txt = f"{metric_label} - " + (city_value if city_value != "__ALL__" else "Alle kommuner")
     df_new = build_hierarchical_dataframe(grouped, TREEMAP_LEVELS, "size", "size")
 
-    color_vals = df_new["color"].astype(float)
-    span = float(color_vals.max() - color_vals.min()) or 1.0
-    norm = (color_vals - color_vals.min()) / span
+    selected_titles = set(selected_titles or [])
+    base_colors = df_new["color"].astype(float)
+    min_val = float(base_colors.min()) if len(base_colors) else 0.0
+    max_val = float(base_colors.max()) if len(base_colors) else 1.0
+    span = max(max_val - min_val, 1e-9)
+    norm = (base_colors - min_val) / span
     text_colors = np.where(norm > 0.35, "#f8f9ff", "#11151b")
+
+    selected_mask = (df_new["level"] == "titel") & df_new["label"].isin(selected_titles)
+    color_values = base_colors.copy()
+    marker_colorscale = px.colors.sequential.Blues
+    marker_cmin = min_val
+    marker_cmax = max_val
+
+    if selected_mask.any():
+        text_colors = np.array(text_colors, copy=True)
+        text_colors[selected_mask] = "#ced4da"
+
+        epsilon = max(span * 1e-6, 1e-9)
+        near_min_mask = (~selected_mask) & np.isclose(color_values, min_val)
+        color_values[near_min_mask] = color_values[near_min_mask] + epsilon
+        color_values[selected_mask] = min_val
+
+        grey_break = min(max(epsilon / span, 1e-4), 0.05)
+        scaled = [[0.0, "#ff00b3"], [grey_break, "#ff00b3"]] #CHANGE COLOR HERE
+        blues = px.colors.sequential.Blues
+        if len(blues) == 1:
+            scaled.append([1.0, blues[0]])
+        else:
+            for idx, color in enumerate(blues):
+                t = idx / (len(blues) - 1)
+                mapped = grey_break + (1 - grey_break) * t
+                scaled.append([mapped, color])
+        marker_colorscale = scaled
 
     hover_text = (
         f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
         "%{percentParent:.1%} af niveauet over<br>"
         "%{percentEntry:.1%} af totalen<extra></extra>"
     )
+
+    marker_dict = dict(
+        colors=color_values,
+        colorscale=marker_colorscale,
+        colorbar=dict(
+            title=dict(text=metric_label, font=dict(color=FONT_COL)),
+            tickfont=dict(color=FONT_COL),
+            outlinecolor="#2a2f3a",
+        ),
+    )
+    marker_dict["cmin"] = marker_cmin
+    marker_dict["cmax"] = marker_cmax
 
     fig = go.Figure(
         go.Treemap(
@@ -598,15 +646,7 @@ def build_city_treemap(data: DataBundle, city_value: str, metric_key: str) -> go
             parents=df_new["parent"],
             values=df_new["value"],
             branchvalues="total",
-            marker=dict(
-                colors=df_new["color"],
-                colorscale="Blues",
-                colorbar=dict(
-                    title=dict(text=metric_label, font=dict(color=FONT_COL)),
-                    tickfont=dict(color=FONT_COL),
-                    outlinecolor="#2a2f3a",
-                ),
-            ),
+            marker=marker_dict,
             texttemplate=f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>%{{percentParent:.1%}}",
             textfont=dict(color=text_colors),
             hovertemplate=hover_text,
