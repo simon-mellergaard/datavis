@@ -82,6 +82,19 @@ PARCOORD_LIKERT_COLUMNS = {
     "undervisere_hjaelp_likert",
     "undervisere_kontakt_likert",
 }
+
+COLOR_PALETTE = [
+    "#d62728",
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+]
 PARCOORD_LABELS: Dict[str, str] = {
     "fagligmiljo_likert": "Fagligt miljø",
     "arbmedstud_likert": "Arbejde med studier",
@@ -108,6 +121,45 @@ PARCOORD_LABELS: Dict[str, str] = {
 def bar_colors(n: int) -> Sequence[str]:
     steps = [i / (n - 1) if n > 1 else 0 for i in range(max(n, 1))]
     return px.colors.sample_colorscale(px.colors.sequential.Blues_r, steps)
+
+
+def build_color_map_for_selected(
+    selected_titles: Iterable[str],
+    previous_map: Dict[str, str] | None = None,
+) -> Dict[str, str]:
+    selected_list = [t for t in selected_titles if t]
+    cmap = dict(previous_map or {})
+    next_idx = len(cmap)
+    for title in selected_list:
+        if title not in cmap:
+            cmap[title] = COLOR_PALETTE[next_idx % len(COLOR_PALETTE)]
+            next_idx += 1
+    return cmap
+
+
+def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, str]) -> html.Div:
+    titles = [t for t in selected_titles if t]
+    if not titles:
+        return html.Div(
+            "Ingen uddannelser valgt endnu.",
+            style={"color": "#adb5c6", "fontStyle": "italic", "fontSize": "14px"},
+        )
+
+    items = []
+    for title in titles:
+        swatch = html.Div(
+            style={
+                "width": "16px",
+                "height": "16px",
+                "borderRadius": "4px",
+                "backgroundColor": color_map.get(title, "#f8f9fa"),
+                "marginRight": "8px",
+            }
+        )
+        label = html.Span(title, style={"color": FONT_COL, "fontSize": "14px"})
+        items.append(html.Div([swatch, label], style={"display": "flex", "alignItems": "center"}))
+
+    return html.Div(items, style={"display": "flex", "flexWrap": "wrap", "gap": "12px"})
 
 
 def build_flow_df(data: DataBundle, selected_bachelors: Iterable[str]) -> pd.DataFrame:
@@ -647,6 +699,7 @@ def build_parallel_coordinates(
     selected_titles: Iterable[str],
     slider_filter: Dict[str, Sequence[float]],
     selected_vars: Iterable[str],
+    color_map: Dict[str, str],
 ) -> go.Figure:
     df = data.df.copy().dropna(subset=["titel"])
     columns = [col for col in selected_vars if col in df.columns]
@@ -692,15 +745,15 @@ def build_parallel_coordinates(
             height=560,
         )
         return fig
-    highlight_set = {t for t in selected_titles if t}
-
-    line_colors: List[float] = []
+    selected_list = [t for t in selected_titles if t]
+    slider_active = bool(slider_filter)
+    numeric_line_values: List[float] = []
     for _, row in df.iterrows():
         title = row["titel"]
-        if title in highlight_set:
-            line_colors.append(1.0)
+        if title in selected_list:
+            numeric_line_values.append(selected_list.index(title) + 1)
             continue
-        if slider_filter:
+        if slider_active:
             matches = True
             for col, (low, high) in slider_filter.items():
                 if col not in row or pd.isna(row[col]):
@@ -710,12 +763,9 @@ def build_parallel_coordinates(
                 if value < low or value > high:
                     matches = False
                     break
-            line_colors.append(0.6 if matches else 0.1)
+            numeric_line_values.append(0.5 if matches else 0.0)
         else:
-            line_colors.append(0.1)
-
-    if not line_colors:
-        line_colors = [0.1] * len(df)
+            numeric_line_values.append(0.0)
 
     dimensions = []
     for col in columns:
@@ -735,13 +785,24 @@ def build_parallel_coordinates(
             dimension["constraintrange"] = slider_filter[col]
         dimensions.append(dimension)
 
+    count_selected = len(selected_list)
+    cmin = 0.0
+    cmax = max(1.0, float(count_selected) or 1.0)
+    colorscale: List[List[float | str]] = [[0.0, "#E8E8E8"], [1.0, "#E8E8E8"]]
+    if slider_active:
+        colorscale.insert(1, [0.5 / cmax, "#87CEFA"])
+    if count_selected:
+        for idx, title in enumerate(selected_list, start=1):
+            pos = float(idx) / cmax
+            colorscale.insert(-1, [pos, color_map.get(title, "#E8E8E8")])
+
     fig = go.Figure(
         go.Parcoords(
             line=dict(
-                color=line_colors,
-                colorscale=[[0, "#6c757d"], [0.6, "#4dabf7"], [1.0, "#ff6b6b"]],
-                cmin=0,
-                cmax=1,
+                color=numeric_line_values,
+                colorscale=colorscale,
+                cmin=cmin,
+                cmax=cmax,
                 showscale=False,
             ),
             dimensions=dimensions,
@@ -775,7 +836,7 @@ def build_parcoord_sliders(
             min_val, max_val = 1.0, 5.0
             step = 0.1
             marks = {i: str(i) for i in range(1, 6)}
-            default = [1.0, 1.0]
+            default = [5.0, 5.0]
         else:
             series = df[col].dropna().astype(float)
             if series.empty:
@@ -784,10 +845,10 @@ def build_parcoord_sliders(
             max_val = float(series.max())
             if np.isclose(min_val, max_val):
                 max_val = min_val + 1.0
-            step = max((max_val - min_val) / 50.0, 1e-2)
+            step = max((max_val - min_val) / 100.0, 1e-2)
             ticks = np.linspace(min_val, max_val, num=4)
             marks = {float(f"{t:.0f}"): f"{t:.0f}" for t in ticks}
-            default = [min_val, min_val]
+            default = [max_val, max_val]
 
         current = list(previous_values.get(col, default))
         slider = dcc.RangeSlider(
@@ -797,15 +858,16 @@ def build_parcoord_sliders(
             step=step,
             value=current,
             marks=marks,
+            tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
         )
         components.append(
             html.Div(
                 [html.Label(PARCOORD_LABELS.get(col, col)), slider],
-                style={"marginBottom": "12px"},
+                style={"marginBottom": "16px"},
             )
         )
-        if current[0] != current[1]:
+        if current != default:
             slider_filter[col] = current
 
     return components, slider_filter
