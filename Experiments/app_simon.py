@@ -220,9 +220,9 @@ def build_city_treemap(city_value, metric_col, additional_cols=[]):
             pad=dict(b=1, l=1, r=1, t=18),              # padding around each tile
             line=dict(width=1, color='darkgrey'),  # border line around each tile
             # pattern=dict(shape=["|"], solidity=0.80)
-            pattern=dict(
-                shape='x' if df_new['id']=='Universitetsuddannelser/IT - teknik - produktion/Actuarial Mathematics' else '',  # Apply 'x' pattern only to Tile C
-            )
+            # pattern=dict(
+            #     shape='x' if df_new['id']=='Universitetsuddannelser/IT - teknik - produktion/Actuarial Mathematics' else '',  # Apply 'x' pattern only to Tile C
+            # )
             ),
         hovertemplate=f'<b>%{{label}} </b> <br> {col_name_info[metric_col][2]}: %{{value:,.0f}} kr. <br> Faglig miljø: %{{color:.2f}}<extra>this is in the extra thing%{{fullData.name}}</extra>',
         name='',
