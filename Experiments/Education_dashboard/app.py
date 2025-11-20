@@ -24,8 +24,10 @@ from .plots import (
     PARCOORD_VARIABLES,
     bar_colors,
     build_city_treemap,
+    build_color_map_for_selected,
     build_detail_table,
     build_flow_df,
+    build_parcoord_legend,
     build_parcoord_sliders,
     build_parallel_coordinates,
     build_providers_map,
@@ -145,12 +147,8 @@ app.layout = html.Div(
                             },
                             className="dark-dropdown",
                         ),
+                        html.Div(id="parcoord_legend", style={"marginBottom": "12px"}),
                         dcc.Graph(id="parallel_plot", style={"height": "560px"}),
-                        html.Div(
-                            "Hold musen over linjerne for at se uddannelsesnavnet.",
-                            id="parcoord_hover_label",
-                            style={"marginTop": "8px", "fontStyle": "italic", "color": "#adb5c6"},
-                        ),
                     ],
                     style={"flex": "3 1 0px", "minWidth": "520px", **CUSTOM_CARD},
                 ),
@@ -255,6 +253,7 @@ app.layout = html.Div(
                 )
             ],
         ),
+        dcc.Store(id="parcoord_color_store", data={}),
     ],
 )
 
@@ -356,34 +355,32 @@ def update_selection_summary(a, b, c):
 @app.callback(
     Output("parallel_plot", "figure"),
     Output("parcoord_sliders", "children"),
-    Output("parcoord_hover_label", "children"),
+    Output("parcoord_color_store", "data"),
+    Output("parcoord_legend", "children"),
     Input("parcoord_vars", "value"),
     Input("edu1", "value"),
     Input("edu2", "value"),
     Input("edu3", "value"),
     Input({"type": "parcoord-slider", "column": ALL}, "value"),
-    Input("parallel_plot", "hoverData"),
     State({"type": "parcoord-slider", "column": ALL}, "id"),
+    State("parcoord_color_store", "data"),
 )
-def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, hover_data, slider_ids):
+def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, slider_ids, color_store):
     available = parcoord_available
     chosen = [v for v in (selected_vars or parcoord_default) if v in available]
     if not chosen:
         chosen = available[:5]
 
-    prev = {}
+    prev_slider_values = {}
     if slider_ids and slider_values:
-        prev = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
+        prev_slider_values = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
 
-    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev)
+    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values)
     selected_titles = [t for t in [e1, e2, e3] if t]
-    figure = build_parallel_coordinates(data, selected_titles, slider_filter, chosen)
-    hover_text = "Hold musen over linjerne for at se uddannelsesnavnet."
-    if hover_data and "points" in hover_data and hover_data["points"]:
-        label = hover_data["points"][0].get("id")
-        if label:
-            hover_text = f"Linje: {label}"
-    return figure, slider_components, hover_text
+    color_map = build_color_map_for_selected(selected_titles, color_store)
+    figure = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map)
+    legend = build_parcoord_legend(selected_titles, color_map)
+    return figure, slider_components, color_map, legend
 
 
 @app.callback(Output("kandidat_bar", "figure"), Output("kandidat_flow", "figure"), Input("bachelor_multi", "value"))
