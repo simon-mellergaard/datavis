@@ -157,6 +157,7 @@ def load_data(
         "kompetencerudd_p4",
         "kompetencerudd_p5",
         "ledighed_nyudd",
+        "ledighed_10aar",
         "maanedloen_nyudd",
         "maanedloen_10aar",
         "hyppigsteid1",

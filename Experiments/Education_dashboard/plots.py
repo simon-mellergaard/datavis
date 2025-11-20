@@ -14,7 +14,6 @@ from bokeh.resources import CDN
 
 from .helpers import (
     ensure_latlon_from_municipality,
-    mean_fmt,
     mode_str,
     norm_udbud,
     parse_ref,
@@ -48,7 +47,17 @@ DETAIL_GROUPS = {
         "kompetencerudd_p5",
     ],
 }
-DETAIL_NUMERIC = ["kvote_1_kvotient", "standby_8"]
+DETAIL_OVERVIEW_SPECS = [
+    ("optagne", "Optagne", "sum", lambda v: f"{v:,.0f}"),
+    ("kvote_1_kvotient", "Kvote 1 kvotient", "mean", lambda v: f"{v:.2f}"),
+    ("standby_8", "Standby", "mean", lambda v: f"{v:.2f}"),
+    ("afbrud", "Afbrud (%)", "mean", lambda v: f"{v:.1f}%"),
+    ("tidsforbrug_p50", "Tidsforbrug (timer)", "mean", lambda v: f"{v:.1f}"),
+    ("ledighed_nyudd", "Ledighed (nyudd.)", "mean", lambda v: f"{v:.1f}%"),
+    ("ledighed_10aar", "Ledighed (10 år)", "mean", lambda v: f"{v:.1f}%"),
+    ("maanedloen_nyudd", "Løn (nyudd.)", "mean", lambda v: f"{v:,.0f} kr"),
+    ("maanedloen_10aar", "Løn (10 år)", "mean", lambda v: f"{v:,.0f} kr"),
+]
 
 PARCOORD_VARIABLES = [
     "fagligmiljo_likert",
@@ -359,6 +368,9 @@ def build_detail_table(data: DataBundle, edu_title: str):
     if providers.empty:
         providers = data.df_raw[data.df_raw["titel"].astype(str) == str(edu_title)].copy()
 
+    overview = data.df[data.df["titel"].astype(str) == str(edu_title)]
+    overview_row = overview.iloc[0] if not overview.empty else None
+
     strings = {
         label: mode_str(providers.get(col, pd.Series(dtype=object)))
         for col, label in [
@@ -369,17 +381,28 @@ def build_detail_table(data: DataBundle, edu_title: str):
         ]
     }
 
-    numeric = {}
-    for column in DETAIL_NUMERIC:
+    def parse_single_value(value):
+        series = pd.Series([value])
+        numeric = to_num(series).iloc[0]
+        return None if pd.isna(numeric) else float(numeric)
+
+    def metric_value(column: str, how: str):
+        if overview_row is not None and column in overview_row.index:
+            val = parse_single_value(overview_row[column])
+            if val is not None:
+                return val
         if column in providers.columns:
-            mean_value = mean_fmt(providers[column])
-            if mean_value is not None:
-                numeric[column] = mean_value
+            series = to_num(providers[column]).dropna()
+            if series.empty:
+                return None
+            return float(series.sum()) if how == "sum" else float(series.mean())
+        return None
 
     rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
-    for key, value in numeric.items():
-        label = "Kvote 1 kvotient" if key == "kvote_1_kvotient" else "Standby (8)"
-        rows.append(html.Tr([html.Th(label), html.Td(f"{value:.2f}")]))
+    for column, label, how, formatter in DETAIL_OVERVIEW_SPECS:
+        value = metric_value(column, how)
+        display = formatter(value) if value is not None else "N/A"
+        rows.append(html.Tr([html.Th(label), html.Td(display)]))
     if any(strings.values()):
         rows.append(
             html.Tr(
