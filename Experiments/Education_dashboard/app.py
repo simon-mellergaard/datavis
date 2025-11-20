@@ -12,7 +12,6 @@ from dash import (
     callback_context,
     dcc,
     html,
-    no_update,
 )
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
@@ -33,20 +32,13 @@ from .plots import (
     build_providers_map,
     build_sankey,
 )
-from .theme import (
-    CUSTOM_BG,
-    CUSTOM_CARD,
-    FONT_COL,
-    MODAL_CARD_STYLE,
-    MODAL_HIDDEN_STYLE,
-    MODAL_VISIBLE_STYLE,
-    PLOT_BG,
-)
+from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, PLOT_BG
 
 data = load_data()
 
 ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / "assets"
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
+TREEMAP_PROMPT = "Klik på treemap-cellerne for at vælge en uddannelse."
 
 
 def render_selection_rows(values):
@@ -143,6 +135,35 @@ app.layout = html.Div(
                         dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
                         html.Div(
                             [
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            TREEMAP_PROMPT,
+                                            id="treemap_pending_label",
+                                            style={"flex": "1"},
+                                        ),
+                                        html.Button(
+                                            "Tilføj til sammenligning",
+                                            id="treemap_add",
+                                            disabled=True,
+                                            style={
+                                                "padding": "6px 14px",
+                                                "backgroundColor": "#2b8a3e",
+                                                "color": "#fff",
+                                                "border": "none",
+                                                "borderRadius": "4px",
+                                                "cursor": "pointer",
+                                            },
+                                        ),
+                                    ],
+                                    style={
+                                        "display": "flex",
+                                        "gap": "10px",
+                                        "alignItems": "center",
+                                        "flexWrap": "wrap",
+                                        "marginBottom": "10px",
+                                    },
+                                ),
                                 html.Div("Valgte uddannelser:", style={"fontWeight": "600", "marginBottom": "6px"}),
                                 html.Div(
                                     render_selection_rows([None, None, None]),
@@ -272,46 +293,6 @@ app.layout = html.Div(
             style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
         dcc.Store(id="treemap_pending"),
-        html.Div(
-            id="treemap_modal",
-            style=MODAL_HIDDEN_STYLE,
-            children=[
-                html.Div(
-                    [
-                        html.H4("Tilføj uddannelse?", style={"marginBottom": "8px"}),
-                        html.Div(id="treemap_modal_label", style={"marginBottom": "16px", "fontSize": "15px"}),
-                        html.Div(
-                            [
-                                html.Button(
-                                    "Tilføj",
-                                    id="treemap_confirm",
-                                    style={
-                                        "padding": "6px 18px",
-                                        "backgroundColor": "#2b8a3e",
-                                        "border": "none",
-                                        "color": "#fff",
-                                        "borderRadius": "4px",
-                                    },
-                                ),
-                                html.Button(
-                                    "Annullér",
-                                    id="treemap_cancel",
-                                    style={
-                                        "padding": "6px 18px",
-                                        "backgroundColor": "#b02a37",
-                                        "border": "none",
-                                        "color": "#fff",
-                                        "borderRadius": "4px",
-                                    },
-                                ),
-                            ],
-                            style={"display": "flex", "gap": "10px", "justifyContent": "center"},
-                        ),
-                    ],
-                    style=MODAL_CARD_STYLE,
-                )
-            ],
-        ),
         dcc.Store(id="parcoord_color_store", data={}),
         dcc.Store(id="parcoord_filters_store", data={}),
     ],
@@ -334,40 +315,26 @@ def update_treemap(city_value, metric_key, e1, e2, e3, slider_filter):
 
 
 @app.callback(
-    Output("treemap_modal", "style"),
-    Output("treemap_modal_label", "children"),
     Output("treemap_pending", "data"),
+    Output("treemap_pending_label", "children"),
+    Output("treemap_add", "disabled"),
     Input("treemap", "clickData"),
-    Input("treemap_confirm", "n_clicks"),
-    Input("treemap_cancel", "n_clicks"),
-    State("treemap_pending", "data"),
-    prevent_initial_call=True,
 )
-def toggle_treemap_modal(click_data, confirm_clicks, cancel_clicks, pending):
-    ctx = callback_context
-    if not ctx.triggered:
-        raise PreventUpdate
-    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
-
-    if trigger == "treemap":
-        if not click_data or not click_data.get("points"):
-            raise PreventUpdate
-        label = click_data["points"][0].get("label")
-        if not label or label not in data.available_set:
-            raise PreventUpdate
-        return MODAL_VISIBLE_STYLE, f"Tilføj '{label}' til sammenligningen?", label
-
-    if trigger in {"treemap_confirm", "treemap_cancel"}:
-        return MODAL_HIDDEN_STYLE, "", None
-
-    return no_update, no_update, no_update
+def capture_treemap_selection(click_data):
+    if not click_data or not click_data.get("points"):
+        return None, TREEMAP_PROMPT, True
+    label = click_data["points"][0].get("label")
+    if not label or label not in data.available_set:
+        return None, TREEMAP_PROMPT, True
+    msg = f"Valgt uddannelse: {label}. Klik på 'Tilføj til sammenligning' for at fremhæve den."
+    return label, msg, False
 
 
 @app.callback(
     Output("edu1", "value"),
     Output("edu2", "value"),
     Output("edu3", "value"),
-    Input("treemap_confirm", "n_clicks"),
+    Input("treemap_add", "n_clicks"),
     Input("clear_selections", "n_clicks"),
     Input("remove_edu1", "n_clicks"),
     Input("remove_edu2", "n_clicks"),
@@ -378,7 +345,7 @@ def toggle_treemap_modal(click_data, confirm_clicks, cancel_clicks, pending):
     State("edu3", "value"),
     prevent_initial_call=True,
 )
-def modify_selections(confirm_clicks, clear_clicks, rem1, rem2, rem3, pending, v1, v2, v3):
+def modify_selections(add_clicks, clear_clicks, rem1, rem2, rem3, pending, v1, v2, v3):
     ctx = callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -394,8 +361,8 @@ def modify_selections(confirm_clicks, clear_clicks, rem1, rem2, rem3, pending, v
         slots.append(None)
         return slots[0], slots[1], slots[2]
 
-    if trigger == "treemap_confirm":
-        if not confirm_clicks or not pending or pending not in data.available_set:
+    if trigger == "treemap_add":
+        if not add_clicks or not pending or pending not in data.available_set:
             raise PreventUpdate
 
         slots = [v1, v2, v3]
