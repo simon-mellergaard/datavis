@@ -1,7 +1,8 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, Input, Output, State, callback_context, no_update
+from dash.exceptions import PreventUpdate
 import numpy as np
 
 # ---------- Import data ----------
@@ -125,6 +126,22 @@ CUSTOM_CARD = {
     "border":"1px solid #2a2f3a",
     "borderRadius":"8px"
 }
+
+MODAL_BASE_STYLE = {
+    "position":"fixed",
+    "top":0,
+    "left":0,
+    "width":"100vw",
+    "height":"100vh",
+    "backgroundColor":"rgba(0,0,0,0.55)",
+    "alignItems":"center",
+    "justifyContent":"center",
+    "zIndex":1000,
+    "padding":"16px"
+}
+MODAL_HIDDEN_STYLE = {**MODAL_BASE_STYLE, "display":"none"}
+MODAL_VISIBLE_STYLE = {**MODAL_BASE_STYLE, "display":"flex"}
+MODAL_CARD_STYLE = {**CUSTOM_CARD, "maxWidth":"380px", "width":"100%", "textAlign":"center"}
 
 # ---------- Radar (Likert; raw values) ----------
 radar_vars = [
@@ -555,7 +572,7 @@ def build_city_treemap(city_value, metric_key):
                            x=0.5, y=0.5, xref="paper", yref="paper",
                            font=dict(color=FONT_COL))
         return fig
-
+    df_sel = df_sel.drop_duplicates()
     if how == 'sum':
         grouped = (df_sel
                    .groupby(['educational_category', 'cluster_label', 'titel'], as_index=False)[metric_col]
@@ -573,9 +590,15 @@ def build_city_treemap(city_value, metric_key):
     title_txt = f"{metric_label} — " + (city_value if city_value != '__ALL__' else "Alle kommuner")
     df_new = build_hierarchical_dataframe(grouped, TREEMAP_LEVELS, 'size', 'size')
 
+    # normalize the marker color column so we know which nodes are dark vs. light
+    color_vals = df_new['color'].astype(float)
+    span = float(color_vals.max() - color_vals.min()) or 1.0
+    norm = (color_vals - color_vals.min()) / span
+    text_colors = np.where(norm > 0.35, '#f8f9ff', '#11151b')  # dark tiles → light text, light tiles → dark text
+
     hover_text = (
         f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
-        "%{percentParent:.1%}"
+        "%{percentParent:.1%} af niveauet over<br>"
         "%{percentEntry:.1%} af totalen<extra></extra>"
     )
 
@@ -595,11 +618,12 @@ def build_city_treemap(city_value, metric_key):
             )
         ),
         texttemplate=f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>%{{percentParent:.1%}}",
-        textfont=dict(color=FONT_COL),
+        textfont=dict(color=text_colors),
         hovertemplate=hover_text,
         maxdepth=3,
         name=''
     ))
+
     fig.update_layout(
         template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL,
         margin=dict(t=50, l=30, r=50, b=20), title=title_txt
@@ -609,7 +633,7 @@ def build_city_treemap(city_value, metric_key):
 
 
 # ---------- Dash app ----------
-app = Dash(__name__)
+app = Dash(__name__, assets_folder="../Archive/Experiments/assets") #points the DASH app to the correct assets folder for CSS
 titles_options = [{"label": t, "value": t} for t in AVAILABLE_TITLES]
 
 # ---------- Layout ----------
@@ -618,7 +642,6 @@ app.layout = html.Div(
     children=[
         # Top row: City Treemap + selectors
         html.Div([
-            # Left: filters + treemap
             html.Div([
                 html.Div([
                     html.Div("Filtrér efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
@@ -650,56 +673,25 @@ app.layout = html.Div(
                         className="dark-dropdown",
                     ),
                 ], style={**CUSTOM_CARD, "marginBottom": "10px"}),
-                dcc.Graph(id="treemap", style={"height": "560px", "width": "100%"}),
-            ], style={"flex": "1 1 800px", "minWidth": "600px"}),
-
-            # Right: 3 education selectors
-            html.Div([
-                html.Div("Vælg op til 3 uddannelser:", style={"marginBottom": "8px", "fontWeight": "600"}),
-                dcc.Dropdown(
-                    titles_options,
-                    id="edu1",
-                    placeholder="Uddannelse A",
-                    clearable=True,
-                    style={
-                        "marginBottom": "10px",
-                        "backgroundColor": "#1f2630",
-                        "color": FONT_COL,
-                        "border": "1px solid #2a2f3a",
-                    },
-                    className="dark-dropdown",
-                ),
-                dcc.Dropdown(
-                    titles_options,
-                    id="edu2",
-                    placeholder="Uddannelse B",
-                    clearable=True,
-                    style={
-                        "marginBottom": "10px",
-                        "backgroundColor": "#1f2630",
-                        "color": FONT_COL,
-                        "border": "1px solid #2a2f3a",
-                    },
-                    className="dark-dropdown",
-                ),
-                dcc.Dropdown(
-                    titles_options,
-                    id="edu3",
-                    placeholder="Uddannelse C",
-                    clearable=True,
-                    style={
-                        "backgroundColor": "#1f2630",
-                        "color": FONT_COL,
-                        "border": "1px solid #2a2f3a",
-                    },
-                    className="dark-dropdown",
-                ),
-                html.Div(
-                    "Tip: Radar viser rå Likert (1–5). Løn/ledighed i søjlerne til højre.",
-                    style={"marginTop": "12px", "color": FONT_COL, "fontSize": "12px"},
-                ),
-            ], style={"flex": "0 0 360px", "maxWidth": "360px", **CUSTOM_CARD}),
+                dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
+                html.Div([
+                    html.Div("Valgte uddannelser:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                    html.Div(id="selection_summary_text",
+                             style={"marginBottom": "10px", "lineHeight": "1.5"}),
+                    html.Button("Ryd valg", id="clear_selections",
+                                style={"alignSelf": "flex-start", "padding": "6px 14px",
+                                       "backgroundColor": "#444d5c", "color": "#fff",
+                                       "border": "none", "borderRadius": "4px"})
+                ], style={**CUSTOM_CARD, "marginTop": "10px"}),
+            ], style={"flex": "1 1 1100px", "minWidth": "640px"}),
         ], style={"display": "flex", "gap": "16px", "alignItems": "flex-start", "flexWrap": "wrap"}),
+
+        # Hidden dropdowns to hold the selections (updated via treemap interactions)
+        html.Div([
+            dcc.Dropdown(titles_options, id="edu1", clearable=True),
+            dcc.Dropdown(titles_options, id="edu2", clearable=True),
+            dcc.Dropdown(titles_options, id="edu3", clearable=True),
+        ], style={"display": "none"}),
 
         html.Hr(style={"borderColor": "#2a2f3a"}),
 
@@ -777,6 +769,27 @@ app.layout = html.Div(
             html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})],
                      style={"flex": "1 1 520px", "minWidth": "420px"}),
         ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
+
+        dcc.Store(id="treemap_pending"),
+        html.Div(
+            id="treemap_modal",
+            style=MODAL_HIDDEN_STYLE,
+            children=[
+                html.Div([
+                    html.H4("Tilføj uddannelse?", style={"marginBottom": "8px"}),
+                    html.Div(id="treemap_modal_label",
+                             style={"marginBottom": "16px", "fontSize": "15px"}),
+                    html.Div([
+                        html.Button("Tilføj", id="treemap_confirm",
+                                    style={"padding": "6px 18px", "backgroundColor": "#2b8a3e",
+                                           "border": "none", "color": "#fff", "borderRadius": "4px"}),
+                        html.Button("Annullér", id="treemap_cancel",
+                                    style={"padding": "6px 18px", "backgroundColor": "#b02a37",
+                                           "border": "none", "color": "#fff", "borderRadius": "4px"})
+                    ], style={"display": "flex", "gap": "10px", "justifyContent": "center"})
+                ], style=MODAL_CARD_STYLE)
+            ]
+        ),
     ]
 )
 
@@ -789,6 +802,92 @@ app.layout = html.Div(
 )
 def update_treemap(city_value, metric_key):
     return build_city_treemap(city_value, metric_key)
+
+@app.callback(
+    Output("treemap_modal","style"),
+    Output("treemap_modal_label","children"),
+    Output("treemap_pending","data"),
+    Input("treemap","clickData"),
+    Input("treemap_confirm","n_clicks"),
+    Input("treemap_cancel","n_clicks"),
+    State("treemap_pending","data"),
+    prevent_initial_call=True
+)
+def toggle_treemap_modal(click_data, confirm_clicks, cancel_clicks, pending):
+    ctx = callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger == "treemap":
+        if not click_data or not click_data.get("points"):
+            raise PreventUpdate
+        label = click_data["points"][0].get("label")
+        if not label or label not in AVAILABLE_SET:
+            raise PreventUpdate
+        text = f"Tilføj '{label}' til sammenligningen?"
+        return MODAL_VISIBLE_STYLE, text, label
+
+    if trigger in {"treemap_confirm", "treemap_cancel"}:
+        return MODAL_HIDDEN_STYLE, "", None
+
+    return no_update, no_update, no_update
+
+@app.callback(
+    Output("edu1","value"),
+    Output("edu2","value"),
+    Output("edu3","value"),
+    Input("treemap_confirm","n_clicks"),
+    Input("clear_selections","n_clicks"),
+    State("treemap_pending","data"),
+    State("edu1","value"),
+    State("edu2","value"),
+    State("edu3","value"),
+    prevent_initial_call=True
+)
+def modify_selections(confirm_clicks, clear_clicks, pending, v1, v2, v3):
+    ctx = callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger == "clear_selections":
+        return None, None, None
+
+    if trigger == "treemap_confirm":
+        if not confirm_clicks or not pending or pending not in AVAILABLE_SET:
+            raise PreventUpdate
+
+        slots = [v1, v2, v3]
+        if pending in slots:
+            return slots
+
+        for idx, value in enumerate(slots):
+            if not value:
+                slots[idx] = pending
+                return slots
+
+        slots = [slots[1], slots[2], pending]
+        return slots
+
+    raise PreventUpdate
+
+@app.callback(
+    Output("selection_summary_text","children"),
+    Input("edu1","value"),
+    Input("edu2","value"),
+    Input("edu3","value"),
+)
+def update_selection_summary(a, b, c):
+    selected = [t for t in [a, b, c] if t]
+    if not selected:
+        return html.Div(
+            "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
+            style={"color": "#adb5c6"}
+        )
+
+    items = [html.Div(f"{idx+1}. {title}") for idx, title in enumerate(selected)]
+    return html.Div(items)
 
 @app.callback(
     [Output("radar", "figure"),
