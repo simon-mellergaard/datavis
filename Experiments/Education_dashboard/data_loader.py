@@ -189,7 +189,27 @@ def load_data(
     df_prov["maanedloen_nyudd_n"] = to_num(df_prov.get("maanedloen_nyudd"))
     df_prov["ledighed_nyudd_n"] = to_num(df_prov.get("ledighed_nyudd"))
 
-    city_list = sorted(df_prov["instkommunetx"].dropna().astype(str).unique())
+    excluded_cities = {
+        "ballerup",
+        "bornholm",
+        "brøndby",
+        "faaborg-midtfyn",
+        "guldborgsund",
+        "hedensted",
+        "ikast-brande",
+        "lemvig",
+        "mariagerfjord",
+        "norddjurs",
+        "rudersdal",
+        "vordingborg",
+        "ærø",
+        "uoplyst/ukendt"
+    }
+    city_list = sorted(
+        city
+        for city in df_prov["instkommunetx"].dropna().astype(str).str.strip().unique()
+        if city.lower() not in excluded_cities
+    )
     city_options = (
         [{"label": "Alle kommuner", "value": "__ALL__"}]
         + [{"label": city, "value": city} for city in city_list]
