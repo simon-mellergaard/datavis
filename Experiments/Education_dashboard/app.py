@@ -178,6 +178,11 @@ dropdown_style = {
     "border": "1px solid var(--control-border)",
 
 }
+MAX_SELECTIONS = 10
+selection_inputs = [Input(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
+selection_states = [State(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
+selection_outputs = [Output(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
+remove_inputs = [Input(f"remove_edu{i}", "n_clicks") for i in range(1, MAX_SELECTIONS + 1)]
 
 
 
@@ -361,7 +366,7 @@ app.layout = html.Div(
 
                                 html.Div(
 
-                                    render_selection_rows([None, None, None]),
+                                    render_selection_rows([None]*MAX_SELECTIONS),
 
                                     id="selection_summary_text",
 
@@ -412,19 +417,11 @@ app.layout = html.Div(
         ),
 
         html.Div(
-
             [
-
-                dcc.Dropdown(titles_options, id="edu1", clearable=True),
-
-                dcc.Dropdown(titles_options, id="edu2", clearable=True),
-
-                dcc.Dropdown(titles_options, id="edu3", clearable=True),
-
+                dcc.Dropdown(titles_options, id=f"edu{i}", clearable=True)
+                for i in range(1, MAX_SELECTIONS + 1)
             ],
-
             style={"display": "none"},
-
         ),
 
         html.Hr(style={"borderColor": "var(--divider)"}),
@@ -637,35 +634,23 @@ app.clientside_callback(
 
 
 @app.callback(
-
     Output("treemap", "figure"),
-
-    Input("city_select", "value"),
-
-    Input("size_metric", "value"),
-
-    Input("edu1", "value"),
-
-    Input("edu2", "value"),
-
-    Input("edu3", "value"),
-
-    Input("parcoord_filters_store", "data"),
-
-    Input("theme_store", "data"),
-
+    [
+        Input("city_select", "value"),
+        Input("size_metric", "value"),
+        *selection_inputs,
+        Input("parcoord_filters_store", "data"),
+        Input("theme_store", "data"),
+    ],
 )
-
-def update_treemap(city_value, metric_key, e1, e2, e3, slider_filter, theme_name):
-
+def update_treemap(city_value, metric_key, *args):
+    slider_filter = args[-2] if len(args) >= 2 else {}
+    theme_name = args[-1] if len(args) >= 1 else None
+    selections = list(args[:-2]) if len(args) > 2 else []
     theme = get_theme(theme_name)
-
-    selected = [t for t in [e1, e2, e3] if t]
-
+    selected = [t for t in selections if t]
     slider_filter = slider_filter or {}
-
     return build_city_treemap(data, city_value, metric_key, selected, slider_filter, theme)
-
 
 
 
@@ -703,220 +688,128 @@ def capture_treemap_selection(click_data):
 
 
 @app.callback(
-
-    Output("edu1", "value"),
-
-    Output("edu2", "value"),
-
-    Output("edu3", "value"),
-
-    Input("treemap_add", "n_clicks"),
-
-    Input("clear_selections", "n_clicks"),
-
-    Input("remove_edu1", "n_clicks"),
-
-    Input("remove_edu2", "n_clicks"),
-
-    Input("remove_edu3", "n_clicks"),
-
-    State("treemap_pending", "data"),
-
-    State("edu1", "value"),
-
-    State("edu2", "value"),
-
-    State("edu3", "value"),
-
+    selection_outputs,
+    [Input("treemap_add", "n_clicks"), Input("clear_selections", "n_clicks"), *remove_inputs],
+    [State("treemap_pending", "data"), *selection_states],
     prevent_initial_call=True,
-
 )
-
-def modify_selections(add_clicks, clear_clicks, rem1, rem2, rem3, pending, v1, v2, v3):
-
+def modify_selections(add_clicks, clear_clicks, *args):
+    remove_clicks = list(args[:MAX_SELECTIONS])
+    pending = args[MAX_SELECTIONS]
+    current = list(args[MAX_SELECTIONS + 1:])
     ctx = callback_context
-
     if not ctx.triggered:
-
         raise PreventUpdate
-
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
-
-
     if trigger == "clear_selections":
-
-        return None, None, None
-
-
+        return [None] * MAX_SELECTIONS
 
     if trigger.startswith("remove_edu"):
-
         idx = int(trigger.replace("remove_edu", "")) - 1
-
-        slots = [v1, v2, v3]
-
-        slots.pop(idx)
-
-        slots.append(None)
-
-        return slots[0], slots[1], slots[2]
-
-
+        compact = [v for i, v in enumerate(current) if i != idx and v]
+        compact += [None] * (MAX_SELECTIONS - len(compact))
+        return compact
 
     if trigger == "treemap_add":
-
         if not add_clicks or not pending or pending not in data.available_set:
-
             raise PreventUpdate
-
-
-
-        slots = [v1, v2, v3]
-
-        if pending in slots:
-
-            return slots
-
-
-
-        for idx, value in enumerate(slots):
-
-            if not value:
-
-                slots[idx] = pending
-
-                return slots
-
-
-
-        slots = [slots[1], slots[2], pending]
-
-        return slots
-
-
+        if pending in current:
+            return current
+        for i, val in enumerate(current):
+            if not val:
+                current[i] = pending
+                return current
+        current = current[1:] + [pending]
+        return current
 
     raise PreventUpdate
 
 
 
 
-
-@app.callback(Output("selection_summary_text", "children"), Input("edu1", "value"), Input("edu2", "value"), Input("edu3", "value"))
-
-def update_selection_summary(a, b, c):
-
-    return render_selection_rows([a, b, c])
-
+@app.callback(Output("selection_summary_text", "children"), selection_inputs)
+def update_selection_summary(*values):
+    return render_selection_rows(list(values))
 
 
 
 
 @app.callback(
-
     Output("parallel_plot", "srcDoc"),
-
     Output("parcoord_sliders", "children"),
-
     Output("parcoord_color_store", "data"),
-
     Output("parcoord_filters_store", "data"),
-
     Output("parcoord_legend", "children"),
-
-    Input("parcoord_vars", "value"),
-
-    Input("edu1", "value"),
-
-    Input("edu2", "value"),
-
-    Input("edu3", "value"),
-
-    Input("city_select", "value"),
-
-    Input({"type": "parcoord-slider", "column": ALL}, "value"),
-
-    Input("theme_store", "data"),
-
-    State({"type": "parcoord-slider", "column": ALL}, "id"),
-
-    State("parcoord_color_store", "data"),
-
+    [
+        Input("parcoord_vars", "value"),
+        *selection_inputs,
+        Input("city_select", "value"),
+        Input({"type": "parcoord-slider", "column": ALL}, "value"),
+        Input("theme_store", "data"),
+    ],
+    [
+        State({"type": "parcoord-slider", "column": ALL}, "id"),
+        State("parcoord_color_store", "data"),
+    ],
 )
-
-def update_parallel_plot(selected_vars, e1, e2, e3, city_value, slider_values, theme_name, slider_ids, color_store):
+def update_parallel_plot(*args):
+    selected_vars = args[0] if args else None
+    selections = list(args[1 : 1 + MAX_SELECTIONS])
+    city_value = args[1 + MAX_SELECTIONS] if len(args) > 1 + MAX_SELECTIONS else None
+    slider_values = args[2 + MAX_SELECTIONS] if len(args) > 2 + MAX_SELECTIONS else None
+    theme_name = args[3 + MAX_SELECTIONS] if len(args) > 3 + MAX_SELECTIONS else None
+    slider_ids = args[4 + MAX_SELECTIONS] if len(args) > 4 + MAX_SELECTIONS else None
+    color_store = args[5 + MAX_SELECTIONS] if len(args) > 5 + MAX_SELECTIONS else None
 
     theme = get_theme(theme_name)
-
     allowed_titles = None
-
     if city_value and city_value != "__ALL__":
-
         allowed_titles = set(
-
             data.df_prov.loc[data.df_prov["instkommunetx"] == city_value, "titel"]
-
             .dropna()
-
             .astype(str)
-
             .str.strip()
-
         )
-
         allowed_titles &= data.available_set
 
-
-
     available = parcoord_available
-
     chosen = [v for v in (selected_vars or parcoord_default) if v in available]
-
     if not chosen:
-
         chosen = available[:5]
 
-
-
     prev_slider_values = {}
-
     if slider_ids and slider_values:
-
         prev_slider_values = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
 
-
-
     slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles)
-
-    selected_titles = [t for t in [e1, e2, e3] if t]
-
+    selected_titles = [t for t in selections if t]
     color_map = build_color_map_for_selected(selected_titles, color_store)
-
     figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
-
     legend = build_parcoord_legend(selected_titles, color_map, theme)
-
     return figure_html, slider_components, color_map, slider_filter, legend
-
 
 
 
 
 @app.callback(
     Output("selection_bubble", "figure"),
-    Input("edu1", "value"),
-    Input("edu2", "value"),
-    Input("edu3", "value"),
-    Input("city_select", "value"),
-    Input("parcoord_color_store", "data"),
-    Input("theme_store", "data"),
+    [
+        *selection_inputs,
+        Input("city_select", "value"),
+        Input("parcoord_color_store", "data"),
+        Input("theme_store", "data"),
+    ],
 )
-def update_selection_bubble(e1, e2, e3, city_value, color_store, theme_name):
+def update_selection_bubble(*args):
+    selections = list(args[:MAX_SELECTIONS])
+    city_value = args[MAX_SELECTIONS] if len(args) > MAX_SELECTIONS else None
+    color_store = args[MAX_SELECTIONS + 1] if len(args) > MAX_SELECTIONS + 1 else None
+    theme_name = args[MAX_SELECTIONS + 2] if len(args) > MAX_SELECTIONS + 2 else None
     theme = get_theme(theme_name)
-    titles = [t for t in [e1, e2, e3] if t]
+    titles = [t for t in selections if t]
     color_map = build_color_map_for_selected(titles, color_store)
     return build_selection_bubble(data, titles, color_map, theme, city_value)
-
 
 
 
@@ -960,6 +853,7 @@ def update_detail_panel(edu_title, theme_name):
 if __name__ == "__main__":
 
     app.run_server(debug=True)
+
 
 
 
