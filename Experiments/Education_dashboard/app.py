@@ -832,6 +832,8 @@ def update_selection_summary(a, b, c):
 
     Input("edu3", "value"),
 
+    Input("city_select", "value"),
+
     Input({"type": "parcoord-slider", "column": ALL}, "value"),
 
     Input("theme_store", "data"),
@@ -842,9 +844,29 @@ def update_selection_summary(a, b, c):
 
 )
 
-def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, theme_name, slider_ids, color_store):
+def update_parallel_plot(selected_vars, e1, e2, e3, city_value, slider_values, theme_name, slider_ids, color_store):
 
     theme = get_theme(theme_name)
+
+    allowed_titles = None
+
+    if city_value and city_value != "__ALL__":
+
+        allowed_titles = set(
+
+            data.df_prov.loc[data.df_prov["instkommunetx"] == city_value, "titel"]
+
+            .dropna()
+
+            .astype(str)
+
+            .str.strip()
+
+        )
+
+        allowed_titles &= data.available_set
+
+
 
     available = parcoord_available
 
@@ -864,13 +886,13 @@ def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, theme_name, s
 
 
 
-    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values)
+    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles)
 
     selected_titles = [t for t in [e1, e2, e3] if t]
 
     color_map = build_color_map_for_selected(selected_titles, color_store)
 
-    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme)
+    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
 
     legend = build_parcoord_legend(selected_titles, color_map, theme)
 

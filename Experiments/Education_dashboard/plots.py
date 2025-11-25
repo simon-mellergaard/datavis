@@ -759,9 +759,12 @@ def build_parallel_coordinates(
     selected_vars: Iterable[str],
     color_map: Dict[str, str],
     theme: Theme | None = None,
+    allowed_titles: set[str] | None = None,
 ) -> str:
     theme = theme or DEFAULT_THEME
     df = data.df.copy().dropna(subset=["titel"])
+    if allowed_titles is not None:
+        df = df[df["titel"].isin(allowed_titles)]
     columns = [col for col in selected_vars if col in df.columns]
     if not columns:
         return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>Ingen variabler valgt.</div>"
@@ -893,10 +896,13 @@ def build_parcoord_sliders(
     data: DataBundle,
     selected_vars: Iterable[str],
     previous_values: Dict[str, Sequence[float]],
+    allowed_titles: set[str] | None = None,
 ) -> Tuple[List[html.Div], Dict[str, Sequence[float]]]:
     components: List[html.Div] = []
     slider_filter: Dict[str, Sequence[float]] = {}
     df = data.df
+    if allowed_titles is not None:
+        df = df[df["titel"].isin(allowed_titles)]
 
     for col in selected_vars:
         if col not in df.columns:
