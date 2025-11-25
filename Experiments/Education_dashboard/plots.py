@@ -19,7 +19,7 @@ from .helpers import (
     parse_ref,
     to_num,
 )
-from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, PLOT_BG
+from .theme import DEFAULT_THEME, Theme
 
 if TYPE_CHECKING:  # avoid circular import during runtime
     from .data_loader import DataBundle
@@ -150,12 +150,12 @@ def build_color_map_for_selected(
     return cmap
 
 
-def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, str]) -> html.Div:
+def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, str], theme: Theme) -> html.Div:
     titles = [t for t in selected_titles if t]
     if not titles:
         return html.Div(
             "Ingen uddannelser valgt endnu.",
-            style={"color": "#adb5c6", "fontStyle": "italic", "fontSize": "14px"},
+            style={"color": theme.muted_text, "fontStyle": "italic", "fontSize": "14px"},
         )
 
     items = []
@@ -169,7 +169,7 @@ def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, s
                 "marginRight": "8px",
             }
         )
-        label = html.Span(title, style={"color": FONT_COL, "fontSize": "14px"})
+        label = html.Span(title, style={"color": theme.font, "fontSize": "14px"})
         items.append(html.Div([swatch, label], style={"display": "flex", "alignItems": "center"}))
 
     return html.Div(items, style={"display": "flex", "flexWrap": "wrap", "gap": "12px"})
@@ -269,14 +269,16 @@ def build_sankey(
     flow: pd.DataFrame,
     selected_bachelors: Iterable[str],
     top_k: int = 20,
+    theme: Theme | None = None,
 ) -> go.Figure:
+    theme = theme or DEFAULT_THEME
     if flow.empty:
         empty = go.Figure()
         empty.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
-            font_color=FONT_COL,
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
+            font_color=theme.font,
         )
         return empty
 
@@ -337,7 +339,7 @@ def build_sankey(
                 color=left_colors + right_colors,
                 pad=12,
                 thickness=16,
-                line=dict(color="#2a2f3a", width=1),
+                line=dict(color=theme.card_border, width=1),
             ),
             link=dict(
                 source=sources,
@@ -350,10 +352,10 @@ def build_sankey(
     )
     fig.update_layout(
         title="Flow chart: Bachelor → Kandidat (tykkelse = vægt)",
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
+        template=theme.template,
+        paper_bgcolor=theme.app_bg,
+        plot_bgcolor=theme.plot_bg,
+        font_color=theme.font,
         margin=dict(t=50, l=10, r=20, b=20),
         height=480,
     )
@@ -435,15 +437,16 @@ def build_detail_table(data: DataBundle, edu_title: str):
     return table, providers_small
 
 
-def build_providers_map(providers_df: pd.DataFrame) -> go.Figure:
+def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) -> go.Figure:
+    theme = theme or DEFAULT_THEME
     if providers_df.empty:
         fig = go.Figure()
         fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
             margin=dict(t=0, l=0, r=0, b=0),
-            font_color=FONT_COL,
+            font_color=theme.font,
         )
         return fig
 
@@ -459,18 +462,18 @@ def build_providers_map(providers_df: pd.DataFrame) -> go.Figure:
         fig.add_annotation(
             text="Ingen koordinater og ingen kendt kommune-match.",
             showarrow=False,
-            font=dict(color=FONT_COL, size=12),
+            font=dict(color=theme.font, size=12),
             x=0.5,
             y=0.5,
             xref="paper",
             yref="paper",
         )
         fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
             margin=dict(t=0, l=0, r=0, b=0),
-            font_color=FONT_COL,
+            font_color=theme.font,
         )
         return fig
 
@@ -506,10 +509,10 @@ def build_providers_map(providers_df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         mapbox_style="open-street-map",
         mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
+        template=theme.template,
+        paper_bgcolor=theme.app_bg,
+        plot_bgcolor=theme.plot_bg,
+        font_color=theme.font,
         margin=dict(t=0, l=0, r=0, b=0),
     )
     return fig
@@ -567,7 +570,9 @@ def build_city_treemap(
     metric_key: str,
     selected_titles: Iterable[str] | None = None,
     slider_filter: Dict[str, Sequence[float]] | None = None,
+    theme: Theme | None = None,
 ) -> go.Figure:
+    theme = theme or DEFAULT_THEME
     metric = data.size_metrics.get(metric_key)
     if not metric:
         metric_key = next(iter(data.size_metrics.keys()))
@@ -610,10 +615,10 @@ def build_city_treemap(
     if df_sel.empty:
         fig = go.Figure()
         fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
-            font_color=FONT_COL,
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
+            font_color=theme.font,
             margin=dict(t=30, l=20, r=20, b=20),
         )
         fig.add_annotation(
@@ -623,7 +628,7 @@ def build_city_treemap(
             y=0.5,
             xref="paper",
             yref="paper",
-            font=dict(color=FONT_COL),
+            font=dict(color=theme.font),
         )
         return fig
 
@@ -646,10 +651,10 @@ def build_city_treemap(
     if grouped.empty:
         fig = go.Figure()
         fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor=CUSTOM_BG,
-            plot_bgcolor=PLOT_BG,
-            font_color=FONT_COL,
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
+            font_color=theme.font,
             margin=dict(t=30, l=20, r=20, b=20),
         )
         fig.add_annotation(
@@ -659,7 +664,7 @@ def build_city_treemap(
             y=0.5,
             xref="paper",
             yref="paper",
-            font=dict(color=FONT_COL),
+            font=dict(color=theme.font),
         )
         return fig
 
@@ -672,7 +677,7 @@ def build_city_treemap(
     max_val = float(base_colors.max()) if len(base_colors) else 1.0
     span = max(max_val - min_val, 1e-9)
     norm = (base_colors - min_val) / span
-    text_colors = np.where(norm > 0.35, "#f8f9ff", "#11151b")
+    text_colors = np.where(norm > 0.35, theme.text_on_dark, theme.text_on_light)
 
     selected_mask = (df_new["level"] == "titel") & df_new["label"].isin(selected_titles)
     color_values = base_colors.copy()
@@ -682,7 +687,7 @@ def build_city_treemap(
 
     if selected_mask.any():
         text_colors = np.array(text_colors, copy=True)
-        text_colors[selected_mask] = "#ced4da"
+        text_colors[selected_mask] = theme.muted_text
 
         epsilon = max(span * 1e-6, 1e-9)
         near_min_mask = (~selected_mask) & np.isclose(color_values, min_val)
@@ -711,9 +716,9 @@ def build_city_treemap(
         colors=color_values,
         colorscale=marker_colorscale,
         colorbar=dict(
-            title=dict(text=metric_label, font=dict(color=FONT_COL)),
-            tickfont=dict(color=FONT_COL),
-            outlinecolor="#2a2f3a",
+            title=dict(text=metric_label, font=dict(color=theme.font)),
+            tickfont=dict(color=theme.font),
+            outlinecolor=theme.card_border,
         ),
     )
     marker_dict["cmin"] = marker_cmin
@@ -736,14 +741,14 @@ def build_city_treemap(
     )
 
     fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
+        template=theme.template,
+        paper_bgcolor=theme.app_bg,
+        plot_bgcolor=theme.plot_bg,
+        font_color=theme.font,
         margin=dict(t=50, l=30, r=50, b=20),
         title=title_txt,
     )
-    fig.update_traces(root_color="#1c1f26")
+    fig.update_traces(root_color=theme.root_fill)
     return fig
 
 
@@ -753,15 +758,17 @@ def build_parallel_coordinates(
     slider_filter: Dict[str, Sequence[float]],
     selected_vars: Iterable[str],
     color_map: Dict[str, str],
+    theme: Theme | None = None,
 ) -> str:
+    theme = theme or DEFAULT_THEME
     df = data.df.copy().dropna(subset=["titel"])
     columns = [col for col in selected_vars if col in df.columns]
     if not columns:
-        return "<div style='color:#fff;padding:16px'>Ingen variabler valgt.</div>"
+        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>Ingen variabler valgt.</div>"
 
     df = df.dropna(subset=columns)
     if df.empty:
-        return "<div style='color:#fff;padding:16px'>Ingen data for de valgte variabler.</div>"
+        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>Ingen data for de valgte variabler.</div>"
 
     selected_list = [t for t in selected_titles if t]
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
@@ -833,22 +840,22 @@ def build_parallel_coordinates(
         x_range=(-0.5, len(columns) - 0.5),
         y_range=(0, 1),
         toolbar_location=None,
-        background_fill_color=CUSTOM_BG,
-        border_fill_color=CUSTOM_BG,
+        background_fill_color=theme.app_bg,
+        border_fill_color=theme.app_bg,
     )
     p.grid.visible = False
     p.yaxis.visible = False
     p.xaxis.ticker = list(range(len(columns)))
     p.xaxis.major_label_overrides = {i: PARCOORD_LABELS.get(col, col) for i, col in enumerate(columns)}
-    p.xaxis.major_label_text_color = FONT_COL
-    p.xaxis.major_tick_line_color = "#2a2f3a"
-    p.xaxis.axis_line_color = "#2a2f3a"
+    p.xaxis.major_label_text_color = theme.font
+    p.xaxis.major_tick_line_color = theme.card_border
+    p.xaxis.axis_line_color = theme.card_border
 
     for idx, col in enumerate(columns):
-        p.segment(x0=idx, y0=0, x1=idx, y1=1, line_color="#2a2f3a", line_alpha=0.4)
+        p.segment(x0=idx, y0=0, x1=idx, y1=1, line_color=theme.card_border, line_alpha=0.4)
         lo, hi = axis_ranges[col]
-        p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=FONT_COL, text_font_size="10px")
-        p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=FONT_COL, text_font_size="10px")
+        p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
+        p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
 
     hover_renderers = []
     if base_xs:

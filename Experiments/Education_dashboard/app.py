@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -32,13 +32,13 @@ from .plots import (
     build_providers_map,
     build_sankey,
 )
-from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, PLOT_BG
+from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
 data = load_data()
 
 ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / "assets"
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
-TREEMAP_PROMPT = "Klik på treemap-cellerne for at vælge en uddannelse."
+TREEMAP_PROMPT = "Klik pÃ¥ treemap-cellerne for at vÃ¦lge en uddannelse."
 
 
 def render_selection_rows(values):
@@ -80,8 +80,8 @@ def render_selection_rows(values):
         rows.insert(
             0,
             html.Div(
-                "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
-                style={"color": "#adb5c6", "marginBottom": "6px"},
+                "Ingen uddannelser valgt endnu. Klik pÃ¥ treemap-cellerne og bekrÃ¦ft for at tilfÃ¸je op til tre.",
+                style={"color": "var(--muted-text)", "marginBottom": "6px"},
             ),
         )
 
@@ -91,42 +91,64 @@ titles_options = [{"label": t, "value": t} for t in data.available_titles]
 parcoord_available = [c for c in PARCOORD_VARIABLES if c in data.df.columns]
 parcoord_default = [c for c in PARCOORD_DEFAULT_VARS if c in parcoord_available] or parcoord_available[:5]
 parcoord_options = [{"label": PARCOORD_LABELS.get(c, c), "value": c} for c in parcoord_available]
+dropdown_style = {
+    "marginBottom": "10px",
+    "backgroundColor": "var(--control-bg)",
+    "color": FONT_COL,
+    "border": "1px solid var(--control-border)",
+}
 
 app.layout = html.Div(
     style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
     children=[
+        dcc.Store(id="theme_store", data="dark", storage_type="local"),
+        html.Div(
+            [
+                html.Div("Mørkt tema", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
+                html.Button(
+                    "Skift til lys tilstand",
+                    id="theme_toggle",
+                    n_clicks=0,
+                    style={
+                        "padding": "6px 12px",
+                        "backgroundColor": "#3b82f6",
+                        "color": "#fff",
+                        "border": "none",
+                        "borderRadius": "6px",
+                        "cursor": "pointer",
+                    },
+                ),
+            ],
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "gap": "12px",
+                "marginBottom": "12px",
+            },
+        ),
         html.Div(
             [
                 html.Div(
                     [
                         html.Div(
                             [
-                                html.Div("Filtrér efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                html.Div("FiltrÃ©r efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                 dcc.Dropdown(
                                     data.city_options,
                                     id="city_select",
                                     value="__ALL__",
                                     clearable=False,
-                                    style={
-                                        "marginBottom": "10px",
-                                        "backgroundColor": "#1f2630",
-                                        "color": FONT_COL,
-                                        "border": "1px solid #2a2f3a",
-                                    },
+                                    style=dropdown_style,
                                     className="dark-dropdown",
                                 ),
-                                html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                html.Div("VÃ¦lg stÃ¸rrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                 dcc.Dropdown(
                                     data.size_options,
                                     id="size_metric",
                                     value="optagne",
                                     clearable=False,
-                                    style={
-                                        "marginBottom": "10px",
-                                        "backgroundColor": "#1f2630",
-                                        "color": FONT_COL,
-                                        "border": "1px solid #2a2f3a",
-                                    },
+                                    style=dropdown_style,
                                     className="dark-dropdown",
                                 ),
                             ],
@@ -143,7 +165,7 @@ app.layout = html.Div(
                                             style={"flex": "1"},
                                         ),
                                         html.Button(
-                                            "Tilføj til sammenligning",
+                                            "TilfÃ¸j til sammenligning",
                                             id="treemap_add",
                                             disabled=True,
                                             style={
@@ -199,23 +221,23 @@ app.layout = html.Div(
             ],
             style={"display": "none"},
         ),
-        html.Hr(style={"borderColor": "#2a2f3a"}),
+        html.Hr(style={"borderColor": "var(--divider)"}),
         html.Div(
             [
                 html.Div(
                     [
-                        html.Div("Vælg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("VÃ¦lg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
                             parcoord_options,
                             id="parcoord_vars",
                             value=parcoord_default,
                             multi=True,
-                            placeholder="Vælg variabler",
+                            placeholder="VÃ¦lg variabler",
                             style={
                                 "marginBottom": "12px",
-                                "backgroundColor": "#1f2630",
+                                "backgroundColor": "var(--control-bg)",
                                 "color": FONT_COL,
-                                "border": "1px solid #2a2f3a",
+                                "border": "1px solid var(--control-border)",
                             },
                             className="dark-dropdown",
                         ),
@@ -226,7 +248,7 @@ app.layout = html.Div(
                                 "width": "100%",
                                 "height": "640px",  #Change Parallel coordinates plot size here 
                                 "border": "0",
-                                "backgroundColor": "#0f1115",
+                                "backgroundColor": CUSTOM_BG,
                             },
                         ),
                     ],
@@ -242,19 +264,19 @@ app.layout = html.Div(
             ],
             style={"display": "flex", "gap": "16px", "alignItems": "stretch", "flexWrap": "wrap"},
         ),
-        html.Hr(style={"borderColor": "#2a2f3a"}),
-        html.Div("Udforsk kandidat-retninger (vælg flere bachelorer)", style={"fontWeight": "600", "marginBottom": "6px"}),
+        html.Hr(style={"borderColor": "var(--divider)"}),
+        html.Div("Udforsk kandidat-retninger (vÃ¦lg flere bachelorer)", style={"fontWeight": "600", "marginBottom": "6px"}),
         dcc.Dropdown(
             options=[{"label": t, "value": t} for t in data.bachelor_titles_multi],
             id="bachelor_multi",
-            placeholder="Vælg en eller flere bacheloruddannelser",
+            placeholder="VÃ¦lg en eller flere bacheloruddannelser",
             multi=True,
             clearable=True,
             style={
                 "maxWidth": "900px",
-                "backgroundColor": "#1f2630",
+                "backgroundColor": "var(--control-bg)",
                 "color": FONT_COL,
-                "border": "1px solid #2a2f3a",
+                "border": "1px solid var(--control-border)",
                 "marginBottom": "14px",
             },
             className="dark-dropdown",
@@ -266,7 +288,7 @@ app.layout = html.Div(
             ],
             style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
-        html.Hr(style={"borderColor": "#2a2f3a"}),
+        html.Hr(style={"borderColor": "var(--divider)"}),
         html.Div(
             [
                 html.Div(
@@ -275,13 +297,13 @@ app.layout = html.Div(
                         dcc.Dropdown(
                             titles_options,
                             id="detail_select",
-                            placeholder="Vælg uddannelse",
+                            placeholder="VÃ¦lg uddannelse",
                             clearable=True,
                             style={
                                 "marginBottom": "10px",
-                                "backgroundColor": "#1f2630",
+                                "backgroundColor": "var(--control-bg)",
                                 "color": FONT_COL,
-                                "border": "1px solid #2a2f3a",
+                                "border": "1px solid var(--control-border)",
                             },
                         ),
                         html.Div(id="detail_table", style={"overflowY": "auto"}),
@@ -299,6 +321,33 @@ app.layout = html.Div(
 )
 
 
+@app.callback(Output("theme_store", "data"), Input("theme_toggle", "n_clicks"), State("theme_store", "data"), prevent_initial_call=True)
+def toggle_theme(n_clicks, current_theme):
+    if not n_clicks:
+        raise PreventUpdate
+    current = current_theme or "dark"
+    return "light" if current == "dark" else "dark"
+
+
+app.clientside_callback(
+    """
+    function(theme) {
+        const mode = theme || 'dark';
+        const root = document.documentElement;
+        if (root) {
+            root.setAttribute('data-theme', mode);
+        }
+        const buttonLabel = mode === 'light' ? 'Skift til mørk tilstand' : 'Skift til lys tilstand';
+        const statusLabel = mode === 'light' ? 'Lyst tema' : 'Mørkt tema';
+        return [buttonLabel, statusLabel];
+    }
+    """,
+    Output("theme_toggle", "children"),
+    Output("theme_status", "children"),
+    Input("theme_store", "data"),
+)
+
+
 @app.callback(
     Output("treemap", "figure"),
     Input("city_select", "value"),
@@ -307,11 +356,13 @@ app.layout = html.Div(
     Input("edu2", "value"),
     Input("edu3", "value"),
     Input("parcoord_filters_store", "data"),
+    Input("theme_store", "data"),
 )
-def update_treemap(city_value, metric_key, e1, e2, e3, slider_filter):
+def update_treemap(city_value, metric_key, e1, e2, e3, slider_filter, theme_name):
+    theme = get_theme(theme_name)
     selected = [t for t in [e1, e2, e3] if t]
     slider_filter = slider_filter or {}
-    return build_city_treemap(data, city_value, metric_key, selected, slider_filter)
+    return build_city_treemap(data, city_value, metric_key, selected, slider_filter, theme)
 
 
 @app.callback(
@@ -326,7 +377,7 @@ def capture_treemap_selection(click_data):
     label = click_data["points"][0].get("label")
     if not label or label not in data.available_set:
         return None, TREEMAP_PROMPT, True
-    msg = f"Valgt uddannelse: {label}. Klik på 'Tilføj til sammenligning' for at fremhæve den."
+    msg = f"Valgt uddannelse: {label}. Klik pÃ¥ 'TilfÃ¸j til sammenligning' for at fremhÃ¦ve den."
     return label, msg, False
 
 
@@ -396,10 +447,12 @@ def update_selection_summary(a, b, c):
     Input("edu2", "value"),
     Input("edu3", "value"),
     Input({"type": "parcoord-slider", "column": ALL}, "value"),
+    Input("theme_store", "data"),
     State({"type": "parcoord-slider", "column": ALL}, "id"),
     State("parcoord_color_store", "data"),
 )
-def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, slider_ids, color_store):
+def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, theme_name, slider_ids, color_store):
+    theme = get_theme(theme_name)
     available = parcoord_available
     chosen = [v for v in (selected_vars or parcoord_default) if v in available]
     if not chosen:
@@ -412,15 +465,21 @@ def update_parallel_plot(selected_vars, e1, e2, e3, slider_values, slider_ids, c
     slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values)
     selected_titles = [t for t in [e1, e2, e3] if t]
     color_map = build_color_map_for_selected(selected_titles, color_store)
-    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map)
-    legend = build_parcoord_legend(selected_titles, color_map)
+    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme)
+    legend = build_parcoord_legend(selected_titles, color_map, theme)
     return figure_html, slider_components, color_map, slider_filter, legend
 
 
-@app.callback(Output("kandidat_bar", "figure"), Output("kandidat_flow", "figure"), Input("bachelor_multi", "value"))
-def update_multi_charts(selected):
+@app.callback(
+    Output("kandidat_bar", "figure"),
+    Output("kandidat_flow", "figure"),
+    Input("bachelor_multi", "value"),
+    Input("theme_store", "data"),
+)
+def update_multi_charts(selected, theme_name):
+    theme = get_theme(theme_name)
     empty = go.Figure()
-    empty.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+    empty.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
 
     if not selected:
         return empty, empty
@@ -451,39 +510,52 @@ def update_multi_charts(selected):
             orientation="h",
             marker=dict(color=bar_colors(len(agg))),
             hovertemplate=(
-                "<b>%{y}</b><br>Vægt: %{x:.0f}<br>"
+                "<b>%{y}</b><br>VÃ¦gt: %{x:.0f}<br>"
                 "Ledighed (nyudd.): %{customdata[0]:.1f}<br>"
-                "Løn (nyudd.): %{customdata[1]:.0f}<br>"
-                "Løn (10 år): %{customdata[2]:.0f}<extra></extra>"
+                "LÃ¸n (nyudd.): %{customdata[1]:.0f}<br>"
+                "LÃ¸n (10 Ã¥r): %{customdata[2]:.0f}<extra></extra>"
             ),
             customdata=np.c_[agg["ledighed_nyudd"], agg["maanedloen_nyudd"], agg["maanedloen_10aar"]],
         )
     )
     bar.update_layout(
         title="Top kandidat-retninger (samlet for valgte bachelorer)",
-        template="plotly_dark",
-        paper_bgcolor=CUSTOM_BG,
-        plot_bgcolor=PLOT_BG,
-        font_color=FONT_COL,
+        template=theme.template,
+        paper_bgcolor=theme.app_bg,
+        plot_bgcolor=theme.plot_bg,
+        font_color=theme.font,
         margin=dict(t=50, l=10, r=20, b=40),
         yaxis=dict(automargin=True),
     )
 
-    sankey = build_sankey(data, flow, chosen, top_k=20)
+    sankey = build_sankey(data, flow, chosen, top_k=20, theme=theme)
     return bar, sankey
 
 
-@app.callback(Output("detail_table", "children"), Output("detail_map", "figure"), Input("detail_select", "value"))
-def update_detail_panel(edu_title):
+@app.callback(
+    Output("detail_table", "children"),
+    Output("detail_map", "figure"),
+    Input("detail_select", "value"),
+    Input("theme_store", "data"),
+)
+def update_detail_panel(edu_title, theme_name):
+    theme = get_theme(theme_name)
     if not edu_title or edu_title not in data.available_set:
-        empty_text = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color": FONT_COL})
+        empty_text = html.Div("VÃ¦lg en uddannelse ovenfor for at se detaljer.", style={"color": theme.font})
         empty_map = go.Figure()
-        empty_map.update_layout(template="plotly_dark", paper_bgcolor=CUSTOM_BG, plot_bgcolor=PLOT_BG, font_color=FONT_COL)
+        empty_map.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
         return empty_text, empty_map
     table, providers_small = build_detail_table(data, edu_title)
-    map_fig = build_providers_map(providers_small)
+    map_fig = build_providers_map(providers_small, theme)
     return table, map_fig
 
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
+
+
+
+
+
+

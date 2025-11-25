@@ -1,30 +1,64 @@
-/* Dash Dropdown dark theme */
-.Select-control,
-.Select-menu-outer,
-.Select-menu {
-  background-color: #1f2630 !important;
-  color: #e5e7eb !important;
-  border-color: #2a2f3a !important;
-}
-.Select-value-label, .Select-placeholder { color: #e5e7eb !important; }
-.Select-option { background-color: #1f2630 !important; color: #e5e7eb !important; }
-.Select-option.is-focused, .Select-option:hover { background-color: #2a3340 !important; }
-
-/* assets/dark-dropdown.css */
-.Select-control,
-.Select-menu-outer,
-.Select-value {
-    background-color: #1f2630 !important;
-    color: #ffffff !important;
-    border-color: #2a2f3a !important;
+/* Theme variables */
+:root {
+  --app-bg: #0f1115;
+  --plot-bg: #0f1115;
+  --text-color: #ffffff;
+  --muted-text: #adb5c6;
+  --card-bg: #11151b;
+  --card-border: #2a2f3a;
+  --control-bg: #1f2630;
+  --control-border: #2a2f3a;
+  --divider: #2a2f3a;
 }
 
-.Select-option {
-    background-color: #1f2630 !important;
-    color: #ffffff !important;
+:root[data-theme='dark'] {
+  --app-bg: #0f1115;
+  --plot-bg: #0f1115;
+  --text-color: #ffffff;
+  --muted-text: #adb5c6;
+  --card-bg: #11151b;
+  --card-border: #2a2f3a;
+  --control-bg: #1f2630;
+  --control-border: #2a2f3a;
+  --divider: #2a2f3a;
 }
 
-.Select-option.is-focused,
-.Select-option.is-selected {
-    background-color: #223147 !important;
+:root[data-theme='light'] {
+  --app-bg: #f8fafc;
+  --plot-bg: #ffffff;
+  --text-color: #0f172a;
+  --muted-text: #475569;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --control-bg: #ffffff;
+  --control-border: #cbd5e1;
+  --divider: #cbd5e1;
+}
+
+body {
+  background-color: var(--app-bg);
+  color: var(--text-color);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Dash Dropdown theme */
+.dark-dropdown .Select-control,
+.dark-dropdown .Select-menu-outer,
+.dark-dropdown .Select-menu {
+  background-color: var(--control-bg) !important;
+  color: var(--text-color) !important;
+  border-color: var(--control-border) !important;
+}
+.dark-dropdown .Select-value-label,
+.dark-dropdown .Select-placeholder {
+  color: var(--text-color) !important;
+}
+.dark-dropdown .Select-option {
+  background-color: var(--control-bg) !important;
+  color: var(--text-color) !important;
+}
+.dark-dropdown .Select-option.is-focused,
+.dark-dropdown .Select-option:hover,
+.dark-dropdown .Select-option.is-selected {
+  background-color: rgba(59, 130, 246, 0.18) !important;
 }
