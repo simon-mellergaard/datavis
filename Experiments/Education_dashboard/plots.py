@@ -940,3 +940,120 @@ def build_parcoord_sliders(
             slider_filter[col] = current
 
     return components, slider_filter
+
+
+def build_selection_bubble(
+    data: DataBundle,
+    selected_titles: Iterable[str],
+    color_map: Dict[str, str],
+    theme: Theme | None = None,
+    city_value: str | None = None,
+) -> go.Figure:
+    theme = theme or DEFAULT_THEME
+    titles = [t for t in selected_titles if t]
+    fig = go.Figure()
+    fig.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
+    if not titles:
+        fig.add_annotation(
+            text="Ingen uddannelser valgt endnu.",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            font=dict(color=theme.font),
+        )
+        return fig
+
+    # Use provider-level data (same source as treemap) to respect multiple udbud entries per title.
+    subset = data.df_prov[data.df_prov["titel"].isin(titles)].copy()
+    if city_value and city_value != "__ALL__":
+        subset = subset[subset["instkommunetx"] == city_value]
+    if subset.empty:
+        fig.add_annotation(
+            text="Ingen data for de valgte uddannelser.",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            font=dict(color=theme.font),
+        )
+        return fig
+
+    def kvote_value(series: pd.Series) -> float:
+        # Treat non-numeric / "alle" as missing; fallback to 2.0 if no numeric values.
+        cleaned = []
+        for val in series:
+            if pd.isna(val):
+                continue
+            s = str(val).strip().lower()
+            if not s or "alle" in s:
+                continue
+            num = to_num(pd.Series([val])).iloc[0]
+            if pd.isna(num):
+                continue
+            cleaned.append(float(num))
+        if cleaned:
+            return float(np.mean(cleaned))
+        return 2.0
+
+    rows = []
+    for title, group in subset.groupby("titel"):
+        led = to_num(group.get("ledighed_nyudd", pd.Series(dtype=float))).dropna()
+        lon = to_num(group.get("maanedloen_nyudd", pd.Series(dtype=float))).dropna()
+        if led.empty or lon.empty:
+            continue
+        kvote = kvote_value(group.get("kvote_1_kvotient", pd.Series(dtype=object)))
+        rows.append(
+            dict(
+                titel=title,
+                ledighed_num=float(led.mean()),
+                lon_num=float(lon.mean()),
+                bubble_size=kvote,
+            )
+        )
+
+    agg = pd.DataFrame(rows)
+    if agg.empty:
+        fig.add_annotation(
+            text="Ingen data for de valgte uddannelser.",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            font=dict(color=theme.font),
+        )
+        return fig
+
+    sizes = agg["bubble_size"].astype(float)
+    size_min, size_max = sizes.min(), sizes.max()
+    if np.isclose(size_min, size_max):
+        marker_sizes = [32 for _ in sizes]
+    else:
+        marker_sizes = 20 + 80 * (sizes - size_min) / max(size_max - size_min, 1e-9)
+
+    colors = [color_map.get(t, "#4dabf7") for t in agg["titel"]]
+    hover_text = [
+        f"<b>{row['titel']}</b><br>Ledighed: {row['ledighed_num']:.1f}%<br>Løn (nyudd.): {row['lon_num']:.0f}<br>Kvote 1: {row['bubble_size']:.2f}"
+        for _, row in agg.iterrows()
+    ]
+
+    fig.add_trace(
+        go.Scatter(
+            x=agg["ledighed_num"],
+            y=agg["lon_num"],
+            mode="markers",
+            text=agg["titel"],
+            hovertext=hover_text,
+            hoverinfo="text",
+            marker=dict(size=marker_sizes, color=colors, opacity=0.8, line=dict(color=theme.card_border, width=1)),
+        )
+    )
+    fig.update_layout(
+        xaxis_title="Ledighed (nyudd.)",
+        yaxis_title="Løn (nyudd.)",
+        margin=dict(t=40, l=50, r=30, b=50),
+    )
+    return fig
