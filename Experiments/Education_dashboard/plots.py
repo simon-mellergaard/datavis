@@ -130,6 +130,13 @@ PARCOORD_LABELS: Dict[str, str] = {
     "maanedloen_10aar": "Løn (10 år)",
 }
 
+TREEMAP_DRILL_METRICS = [
+    ("maanedloen_nyudd", PARCOORD_LABELS["maanedloen_nyudd"]),
+    ("ledighed_nyudd", PARCOORD_LABELS["ledighed_nyudd"]),
+    ("stress_daglig_likert", PARCOORD_LABELS["stress_daglig_likert"]),
+    ("tilpas_likert", PARCOORD_LABELS["tilpas_likert"]),
+]
+
 
 def bar_colors(n: int) -> Sequence[str]:
     steps = [i / (n - 1) if n > 1 else 0 for i in range(max(n, 1))]
@@ -562,6 +569,192 @@ def build_hierarchical_dataframe(
         frames.append(df_tree)
 
     return pd.concat(frames, ignore_index=True)
+
+
+def build_treemap_drill_chart(
+    data: "DataBundle",
+    edu_title: str,
+    metric_key: str,
+    city_value: str = "__ALL__",
+    theme: Theme | None = None,
+) -> go.Figure:
+    theme = theme or DEFAULT_THEME
+    df = data.df_prov[data.df_prov["titel"] == edu_title].copy()
+    if city_value and city_value != "__ALL__":
+        df = df[df["instkommunetx"] == city_value]
+        # If we asked for a specific city but have no rows, return an empty chart instead of national fallback.
+        if df.empty:
+            empty = go.Figure()
+            empty.update_layout(
+                template=theme.template,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color=theme.font,
+                margin=dict(t=10, l=10, r=10, b=10),
+                height=160,
+            )
+            empty.add_annotation(
+                text=f"Ingen data for {city_value}.",
+                showarrow=False,
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                font=dict(color=theme.font, size=12),
+            )
+            return empty
+    if df.empty:
+        df = data.df[data.df["titel"] == edu_title].copy()
+    if df.empty or metric_key not in df.columns:
+        fig = go.Figure()
+        fig.update_layout(
+            template=theme.template,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color=theme.font,
+            margin=dict(t=10, l=10, r=10, b=10),
+            height=200,
+        )
+        fig.add_annotation(
+            text="Ingen data for valgte måling.",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            font=dict(color=theme.font, size=12),
+        )
+        return fig
+
+    df = df.dropna(subset=[metric_key])
+    if df.empty:
+        empty = go.Figure()
+        empty.update_layout(
+            template=theme.template,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color=theme.font,
+            margin=dict(t=10, l=10, r=10, b=10),
+            height=160,
+        )
+        empty.add_annotation(
+            text="Ingen observationer for denne variabel.",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            font=dict(color=theme.font, size=12),
+        )
+        return empty
+
+    label = PARCOORD_LABELS.get(metric_key, metric_key)
+
+    if city_value and city_value != "__ALL__":
+        df["provider"] = df.get("hovedinsttx", pd.Series(["Udbyder"] * len(df))).fillna("Udbyder")
+        df_plot = (
+            df.groupby("provider", as_index=False)[metric_key]
+            .mean()
+            .sort_values(metric_key, ascending=False)
+        )
+        title_text = f"{label} - {city_value}"
+        # National comparison bar
+        nat_source = data.df_prov if metric_key in data.df_prov.columns else data.df
+        nat_vals = pd.to_numeric(nat_source[metric_key], errors="coerce")
+        nat_mean = float(nat_vals.mean()) if not nat_vals.dropna().empty else np.nan
+        if not np.isnan(nat_mean):
+            nat_row = pd.DataFrame({"provider": ["Nationalt gennemsnit"], metric_key: [nat_mean]})
+            df_plot = pd.concat([df_plot, nat_row], ignore_index=True)
+            # Ensure chosen providers stay left and national last
+            df_plot["order_key"] = df_plot["provider"].apply(lambda x: 1 if x == "Nationalt gennemsnit" else 0)
+            df_plot = df_plot.sort_values(["order_key", "provider"], ascending=[True, True])
+    else:
+        # National aggregation: single bar
+        df_plot = (
+            df.groupby("titel", as_index=False)[metric_key]
+            .mean()
+            .rename(columns={metric_key: "value"})
+        )
+        df_plot["provider"] = "Nationalt gennemsnit"
+        df_plot[metric_key] = df_plot["value"]
+        df_plot = df_plot[["provider", metric_key]]
+        title_text = f"{label} - Nationalt"
+
+    df_plot = df_plot.sort_values(metric_key, ascending=False).head(8)
+
+    money_metrics = {"maanedloen_nyudd", "maanedloen_10aar"}
+    likert_metrics = PARCOORD_LIKERT_COLUMNS
+    if metric_key in money_metrics:
+        value_col = "value_for_plot"
+        df_plot[value_col] = df_plot[metric_key].astype(float) / 1000.0
+        tick_format = ",.0f"
+        tick_suffix = "k"
+        x_title = f"{label} (t.kr)"
+    elif metric_key in likert_metrics:
+        value_col = metric_key
+        tick_format = ".1f"
+        tick_suffix = ""
+        x_title = label
+    else:
+        value_col = metric_key
+        tick_format = ",.2f"
+        tick_suffix = ""
+        x_title = label
+
+    def _wrap_label(name: str, max_len: int = 10, max_lines: int = 2) -> str:
+        text = str(name)
+        chunks = [text[i : i + max_len] for i in range(0, len(text), max_len)]
+        if len(chunks) > max_lines:
+            chunks = chunks[: max_lines]
+            if len(chunks[-1]) >= 1:
+                chunks[-1] = chunks[-1][: max_len - 1] + "…"
+        return "<br>".join(chunks)
+
+    df_plot["label"] = df_plot["provider"].apply(_wrap_label)
+
+    colors = bar_colors(len(df_plot))
+    ordered_labels = df_plot["label"].tolist()
+
+    fig = go.Figure(
+        go.Bar(
+            x=df_plot["label"],
+            y=df_plot[value_col],
+            orientation="v",
+            marker=dict(color=colors, line=dict(color=theme.card_border, width=0.5)),
+            customdata=df_plot["provider"],
+            hovertemplate="%{customdata}<br>" + label + ": %{y:.2f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        template=theme.template,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color=theme.font,
+        margin=dict(t=32, l=12, r=12, b=60),
+        height=max(260, 60 * max(1, len(df_plot))),
+        xaxis=dict(
+            tickangle=0,
+            tickfont=dict(color=theme.font, size=10),
+            automargin=True,
+            title="",
+            showgrid=False,
+            categoryorder="array",
+            categoryarray=ordered_labels,
+        ),
+        yaxis=dict(
+            showgrid=False,
+            tickfont=dict(color=theme.font),
+            title=title_text,
+            tickformat=tick_format,
+            ticksuffix=tick_suffix,
+            automargin=True,
+            range=[1, 5] if metric_key in likert_metrics else None,
+            dtick=1 if metric_key in likert_metrics else None,
+        ),
+        showlegend=False,
+        bargap=0.4,
+    )
+    return fig
 
 
 def build_city_treemap(

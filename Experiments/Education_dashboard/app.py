@@ -40,6 +40,7 @@ from .plots import (
     PARCOORD_DEFAULT_VARS,
     PARCOORD_LABELS,
     PARCOORD_VARIABLES,
+    TREEMAP_DRILL_METRICS,
     build_city_treemap,
     build_color_map_for_selected,
     build_detail_table,
@@ -48,6 +49,7 @@ from .plots import (
     build_parallel_coordinates,
     build_providers_map,
     build_selection_bubble,
+    build_treemap_drill_chart,
 )
 from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
@@ -292,13 +294,47 @@ app.layout = html.Div(
 
                                 ),
 
+                                html.Div("Drill-down plots (click a celle for detaljer):", style={"marginBottom": "6px", "fontWeight": "600", "marginTop": "10px"}),
+
                             ],
 
                             style={**CUSTOM_CARD, "marginBottom": "10px"},
 
                         ),
 
-                        dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
+                        html.Div(
+
+                            [
+
+                                dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
+
+                                html.Div(
+
+                                    id="treemap_overlay",
+
+                                    style={
+
+                                        "position": "absolute",
+
+                                        "display": "none",
+
+                                        "pointerEvents": "auto",
+
+                                        "zIndex": 5,
+
+                                        "top": 0,
+
+                                        "left": 0,
+
+                                    },
+
+                                ),
+
+                            ],
+
+                            style={"position": "relative"},
+
+                        ),
 
                         html.Div(
 
@@ -685,6 +721,86 @@ def capture_treemap_selection(click_data):
 
 
 
+
+
+@app.callback(
+    Output("treemap_overlay", "children"),
+    Output("treemap_overlay", "style"),
+    Input("treemap", "clickData"),
+    Input("city_select", "value"),
+    Input("theme_store", "data"),
+)
+def show_treemap_drill(click_data, city_value, theme_name):
+
+    base_style = {
+        "position": "absolute",
+        "display": "none",
+        "pointerEvents": "auto",
+        "zIndex": 5,
+        "top": 0,
+        "left": 0,
+        "backgroundColor": "var(--card-bg, rgba(0,0,0,0.75))",
+        "padding": "6px",
+        "borderRadius": "8px",
+        "boxShadow": "0 8px 20px rgba(0,0,0,0.35)",
+    }
+
+    if not click_data or not click_data.get("points"):
+        return None, base_style
+
+    label = click_data["points"][0].get("label")
+
+    if not label or label not in data.available_set:
+        return None, base_style
+
+    theme = get_theme(theme_name)
+
+    figs = []
+    for metric_key, metric_label in TREEMAP_DRILL_METRICS[:4]:
+        fig = build_treemap_drill_chart(data, label, metric_key, city_value, theme)
+        figs.append(
+            html.Div(
+                dcc.Graph(figure=fig, style={"height": "260px", "width": "220px"}),
+                style={"flex": "1 1 220px", "minWidth": "220px"},
+            )
+        )
+
+    bbox = click_data["points"][0].get("bbox") or {}
+    width = max(900, int(bbox.get("w", 900)))
+    height = max(320, int(bbox.get("h", 320)))
+
+    # Center the overlay at the midpoint of the clicked treemap cell.
+    x0 = float(bbox.get("x0", width / 2))
+    y0 = float(bbox.get("y0", height / 2))
+    w = float(bbox.get("w", width))
+    h = float(bbox.get("h", height))
+    left = x0 + w / 2
+    top = y0 + h / 2
+
+    style = dict(base_style)
+    style.update(
+        {
+            "display": "block",
+            "width": f"{width}px",
+            "minHeight": f"{height}px",
+            "top": f"{top}px",
+            "left": f"{left}px",
+            "transform": "translate(-50%, -50%)",
+        }
+    )
+
+    content = html.Div(
+        figs,
+        style={
+            "display": "flex",
+            "flexWrap": "wrap",
+            "gap": "10px",
+            "alignItems": "flex-start",
+            "justifyContent": "flex-start",
+        },
+    )
+
+    return content, style
 
 
 @app.callback(
