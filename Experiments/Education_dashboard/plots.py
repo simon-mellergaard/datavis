@@ -1147,30 +1147,22 @@ def build_selection_bubble(
     color_map: Dict[str, str],
     theme: Theme | None = None,
     city_value: str | None = None,
+    slider_filter: Dict[str, Sequence[float]] | None = None,
 ) -> go.Figure:
     theme = theme or DEFAULT_THEME
-    titles = [t for t in selected_titles if t]
+    selected_set = {t for t in selected_titles if t}
+    titles = list(selected_set)
     fig = go.Figure()
     fig.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
-    if not titles:
-        fig.add_annotation(
-            text="Ingen uddannelser valgt endnu.",
-            showarrow=False,
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-            font=dict(color=theme.font),
-        )
-        return fig
+    slider_filter = slider_filter or {}
 
-    # Use provider-level data (same source as treemap) to respect multiple udbud entries per title.
-    subset = data.df_prov[data.df_prov["titel"].isin(titles)].copy()
+    df = data.df_prov.copy()
+    df = df[df["titel"].notna()]
     if city_value and city_value != "__ALL__":
-        subset = subset[subset["instkommunetx"] == city_value]
-    if subset.empty:
+        df = df[df["instkommunetx"] == city_value]
+    if df.empty:
         fig.add_annotation(
-            text="Ingen data for de valgte uddannelser.",
+            text="Ingen data for valgte filter.",
             showarrow=False,
             x=0.5,
             y=0.5,
@@ -1198,7 +1190,7 @@ def build_selection_bubble(
         return 2.0
 
     rows = []
-    for title, group in subset.groupby("titel"):
+    for title, group in df.groupby("titel"):
         led = to_num(group.get("ledighed_nyudd", pd.Series(dtype=float))).dropna()
         lon = to_num(group.get("maanedloen_nyudd", pd.Series(dtype=float))).dropna()
         if led.empty or lon.empty:
@@ -1210,6 +1202,7 @@ def build_selection_bubble(
                 ledighed_num=float(led.mean()),
                 lon_num=float(lon.mean()),
                 bubble_size=kvote,
+                match_filter=True,  # placeholder
             )
         )
 
@@ -1226,6 +1219,27 @@ def build_selection_bubble(
         )
         return fig
 
+    def matches_slider_row(row: pd.Series) -> bool:
+        if not slider_filter:
+            return False
+        for col, bounds in slider_filter.items():
+            if col not in row.index:
+                continue
+            try:
+                lo, hi = float(bounds[0]), float(bounds[1])
+                val = float(row[col]) if not pd.isna(row[col]) else np.nan
+            except (TypeError, ValueError):
+                return False
+            if pd.isna(val) or val < lo or val > hi:
+                return False
+        return True
+
+    # Evaluate slider match on available columns; use aggregated values where possible
+    for col in slider_filter:
+        if col not in agg.columns and col in df.columns:
+            agg[col] = df.groupby("titel")[col].mean().reindex(agg["titel"]).values
+    agg["match_filter"] = agg.apply(matches_slider_row, axis=1)
+
     sizes = agg["bubble_size"].astype(float)
     size_min, size_max = sizes.min(), sizes.max()
     if np.isclose(size_min, size_max):
@@ -1233,26 +1247,70 @@ def build_selection_bubble(
     else:
         marker_sizes = 20 + 80 * (sizes - size_min) / max(size_max - size_min, 1e-9)
 
-    colors = [color_map.get(t, "#4dabf7") for t in agg["titel"]]
+    colors = []
+    for t, match in zip(agg["titel"], agg["match_filter"]):
+        if t in selected_set:
+            colors.append(color_map.get(t, "#4dabf7"))
+        elif match:
+            colors.append("#6c757d")  # slider matches but not selected = grey highlight
+        else:
+            colors.append("#adb5bd")  # background (only shown if no sliders)
+
     hover_text = [
         f"<b>{row['titel']}</b><br>Ledighed: {row['ledighed_num']:.1f}%<br>Løn (nyudd.): {row['lon_num']:.0f}<br>Kvote 1: {row['bubble_size']:.2f}"
         for _, row in agg.iterrows()
     ]
 
-    fig.add_trace(
-        go.Scatter(
-            x=agg["ledighed_num"],
-            y=agg["lon_num"],
-            mode="markers",
-            text=agg["titel"],
-            hovertext=hover_text,
-            hoverinfo="text",
-            marker=dict(size=marker_sizes, color=colors, opacity=0.8, line=dict(color=theme.card_border, width=1)),
+    # Foreground: selected or filter matches
+    fg_mask = (agg["titel"].isin(selected_set)) | agg["match_filter"]
+    bg_mask = ~fg_mask
+    show_background = not bool(slider_filter)
+
+    if fg_mask.any():
+        fig.add_trace(
+            go.Scatter(
+                x=agg.loc[fg_mask, "ledighed_num"],
+                y=agg.loc[fg_mask, "lon_num"],
+                mode="markers",
+                text=agg.loc[fg_mask, "titel"],
+                hovertext=[hover_text[i] for i, m in enumerate(fg_mask) if m],
+                hoverinfo="text",
+                marker=dict(
+                    size=np.array(marker_sizes)[fg_mask],
+                    color=np.array(colors)[fg_mask],
+                    opacity=0.9,
+                    line=dict(color=theme.card_border, width=1),
+                ),
+                name="Match",
+                customdata=agg.loc[fg_mask, "titel"],
+            )
         )
-    )
+
+    if show_background and bg_mask.any():
+        fig.add_trace(
+            go.Scatter(
+                x=agg.loc[bg_mask, "ledighed_num"],
+                y=agg.loc[bg_mask, "lon_num"],
+                mode="markers",
+                text=agg.loc[bg_mask, "titel"],
+                hovertext=[hover_text[i] for i, m in enumerate(bg_mask) if m],
+                hoverinfo="text",
+                marker=dict(
+                    size=(np.array(marker_sizes)[bg_mask] * 0.6).tolist(),
+                    color="#adb5bd",
+                    opacity=0.6,
+                    line=dict(color=theme.card_border, width=0.5),
+                ),
+                name="Andre",
+                customdata=agg.loc[bg_mask, "titel"],
+            )
+        )
+
+    fig.update_traces(cliponaxis=False)
     fig.update_layout(
         xaxis_title="Ledighed (nyudd.)",
         yaxis_title="Løn (nyudd.)",
         margin=dict(t=40, l=50, r=30, b=50),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig

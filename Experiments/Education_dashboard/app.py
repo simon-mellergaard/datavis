@@ -549,6 +549,7 @@ app.layout = html.Div(
         html.Hr(style={"borderColor": "var(--divider)"}),
         html.Div("Ledighed vs L?n (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
         dcc.Graph(id="selection_bubble", style={"height": "460px"}),
+        dcc.ConfirmDialog(id="bubble_confirm"),
         html.Hr(style={"borderColor": "var(--divider)"}),
 
         html.Div(
@@ -602,10 +603,9 @@ app.layout = html.Div(
         ),
 
         dcc.Store(id="treemap_pending"),
-
         dcc.Store(id="parcoord_color_store", data={}),
-
         dcc.Store(id="parcoord_filters_store", data={}),
+        dcc.Store(id="bubble_pending"),
 
     ],
 
@@ -720,7 +720,22 @@ def capture_treemap_selection(click_data):
     return label, msg, False
 
 
-
+@app.callback(
+    Output("bubble_pending", "data"),
+    Output("bubble_confirm", "displayed"),
+    Output("bubble_confirm", "message"),
+    Input("selection_bubble", "clickData"),
+    selection_inputs,
+)
+def prompt_add_from_bubble(click_data, *values):
+    current = [v for v in values if v]
+    if not click_data or not click_data.get("points"):
+        return None, False, ""
+    point = click_data["points"][0]
+    title = point.get("customdata") or point.get("text")
+    if not title or title in current or title not in data.available_set:
+        return None, False, ""
+    return title, True, f"Vil du tilføje '{title}' til sammenligning?"
 
 
 @app.callback(
@@ -805,14 +820,23 @@ def show_treemap_drill(click_data, city_value, theme_name):
 
 @app.callback(
     selection_outputs,
-    [Input("treemap_add", "n_clicks"), Input("clear_selections", "n_clicks"), *remove_inputs],
-    [State("treemap_pending", "data"), *selection_states],
+    [
+        Input("treemap_add", "n_clicks"),
+        Input("clear_selections", "n_clicks"),
+        *remove_inputs,
+        Input("bubble_confirm", "submit_n_clicks"),
+        Input("bubble_confirm", "cancel_n_clicks"),
+    ],
+    [State("treemap_pending", "data"), *selection_states, State("bubble_pending", "data")],
     prevent_initial_call=True,
 )
 def modify_selections(add_clicks, clear_clicks, *args):
     remove_clicks = list(args[:MAX_SELECTIONS])
-    pending = args[MAX_SELECTIONS]
-    current = list(args[MAX_SELECTIONS + 1:])
+    bubble_submit = args[MAX_SELECTIONS]
+    bubble_cancel = args[MAX_SELECTIONS + 1]
+    pending = args[MAX_SELECTIONS + 2]
+    current = list(args[MAX_SELECTIONS + 3: MAX_SELECTIONS + 3 + MAX_SELECTIONS])
+    bubble_pending = args[-1] if len(args) > MAX_SELECTIONS * 2 + 3 else None
     ctx = callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -837,6 +861,18 @@ def modify_selections(add_clicks, clear_clicks, *args):
                 current[i] = pending
                 return current
         current = current[1:] + [pending]
+        return current
+
+    if trigger == "bubble_confirm":
+        if not bubble_submit or not bubble_pending or bubble_pending not in data.available_set:
+            raise PreventUpdate
+        if bubble_pending in current:
+            return current
+        for i, val in enumerate(current):
+            if not val:
+                current[i] = bubble_pending
+                return current
+        current = current[1:] + [bubble_pending]
         return current
 
     raise PreventUpdate
@@ -914,6 +950,7 @@ def update_parallel_plot(*args):
         *selection_inputs,
         Input("city_select", "value"),
         Input("parcoord_color_store", "data"),
+        Input("parcoord_filters_store", "data"),
         Input("theme_store", "data"),
     ],
 )
@@ -921,11 +958,12 @@ def update_selection_bubble(*args):
     selections = list(args[:MAX_SELECTIONS])
     city_value = args[MAX_SELECTIONS] if len(args) > MAX_SELECTIONS else None
     color_store = args[MAX_SELECTIONS + 1] if len(args) > MAX_SELECTIONS + 1 else None
-    theme_name = args[MAX_SELECTIONS + 2] if len(args) > MAX_SELECTIONS + 2 else None
+    slider_filter = args[MAX_SELECTIONS + 2] if len(args) > MAX_SELECTIONS + 2 else None
+    theme_name = args[MAX_SELECTIONS + 3] if len(args) > MAX_SELECTIONS + 3 else None
     theme = get_theme(theme_name)
     titles = [t for t in selections if t]
     color_map = build_color_map_for_selected(titles, color_store)
-    return build_selection_bubble(data, titles, color_map, theme, city_value)
+    return build_selection_bubble(data, titles, color_map, theme, city_value, slider_filter)
 
 
 
