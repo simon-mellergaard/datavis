@@ -33,7 +33,7 @@ from theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
 data = load_data()
 
-ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / "assets"
+ASSETS_PATH = Path(__file__).resolve().parents[0] / "assets"
 
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
 
