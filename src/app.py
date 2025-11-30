@@ -1,41 +1,19 @@
 from __future__ import annotations
-
-
-
 from pathlib import Path
-
-
-
 import numpy as np
-
 from dash import (
-
     Dash,
-
     ALL,
-
     Input,
-
     Output,
-
     State,
-
     callback_context,
-
     dcc,
-
     html,
-
 )
-
 from dash.exceptions import PreventUpdate
-
 import plotly.graph_objects as go
-
-
-
 from data_loader import load_data
-
 from plots import (
     PARCOORD_DEFAULT_VARS,
     PARCOORD_LABELS,
@@ -53,132 +31,70 @@ from plots import (
 )
 from theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
-
-
 data = load_data()
-
-
 
 ASSETS_PATH = Path(__file__).resolve().parents[2] / "Archive" / "Experiments" / "assets"
 
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
 
-TREEMAP_PROMPT = "Klik pÃ¥ treemap-cellerne for at vÃ¦lge en uddannelse."
-
-
-
+TREEMAP_PROMPT = "Klik på treemap-cellerne for at vælge en uddannelse."
 
 
 def render_selection_rows(values):
-
     rows = []
-
     visible_index = 1
-
     for idx, value in enumerate(values, start=1):
-
         has_value = bool(value)
-
         label = f"{visible_index}. {value}" if has_value else ""
-
         if has_value:
-
             visible_index += 1
-
         rows.append(
-
             html.Div(
-
                 [
-
                     html.Span(label, style={"flex": "1"}),
-
                     html.Button(
-
                         "Fjern",
-
                         id=f"remove_edu{idx}",
-
                         n_clicks=0,
-
                         style={
-
                             "backgroundColor": "#b02a37",
-
                             "color": "#fff",
-
                             "border": "none",
-
                             "padding": "4px 10px",
-
                             "borderRadius": "4px",
-
                             "cursor": "pointer",
-
                         },
-
                     ),
-
                 ],
 
                 style={
-
                     "display": "flex" if has_value else "none",
-
                     "alignItems": "center",
-
                     "gap": "8px",
-
                     "marginBottom": "6px",
-
                 },
-
             )
-
         )
-
-
 
     if visible_index == 1:
-
         rows.insert(
-
             0,
-
             html.Div(
-
-                "Ingen uddannelser valgt endnu. Klik pÃ¥ treemap-cellerne og bekrÃ¦ft for at tilfÃ¸je op til tre.",
-
+                "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
                 style={"color": "var(--muted-text)", "marginBottom": "6px"},
-
             ),
-
         )
-
-
-
     return rows
 
-
-
 titles_options = [{"label": t, "value": t} for t in data.available_titles]
-
 parcoord_available = [c for c in PARCOORD_VARIABLES if c in data.df.columns]
-
 parcoord_default = [c for c in PARCOORD_DEFAULT_VARS if c in parcoord_available] or parcoord_available[:5]
-
 parcoord_options = [{"label": PARCOORD_LABELS.get(c, c), "value": c} for c in parcoord_available]
-
 dropdown_style = {
-
     "marginBottom": "10px",
-
     "backgroundColor": "var(--control-bg)",
-
     "color": FONT_COL,
-
     "border": "1px solid var(--control-border)",
-
 }
 MAX_SELECTIONS = 10
 selection_inputs = [Input(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
@@ -187,269 +103,142 @@ selection_outputs = [Output(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS
 remove_inputs = [Input(f"remove_edu{i}", "n_clicks") for i in range(1, MAX_SELECTIONS + 1)]
 
 
-
 app.layout = html.Div(
-
     style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
-
     children=[
-
         dcc.Store(id="theme_store", data="dark", storage_type="local"),
-
         html.Div(
-
             [
-
                 html.Div("Mørkt tema", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
-
                 html.Button(
-
                     "Skift til lys tilstand",
-
                     id="theme_toggle",
-
                     n_clicks=0,
-
                     style={
-
                         "padding": "6px 12px",
-
                         "backgroundColor": "#3b82f6",
-
                         "color": "#fff",
-
                         "border": "none",
-
                         "borderRadius": "6px",
-
                         "cursor": "pointer",
-
                     },
-
                 ),
-
             ],
 
             style={
-
                 "display": "flex",
-
                 "justifyContent": "space-between",
-
                 "alignItems": "center",
-
                 "gap": "12px",
-
                 "marginBottom": "12px",
-
             },
-
         ),
 
         html.Div(
-
             [
-
                 html.Div(
-
                     [
-
                         html.Div(
-
                             [
-
-                                html.Div("FiltrÃ©r efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
-
+                                html.Div("Filtrer efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                 dcc.Dropdown(
-
                                     data.city_options,
-
                                     id="city_select",
-
                                     value="__ALL__",
-
                                     clearable=False,
-
                                     style=dropdown_style,
-
                                     className="dark-dropdown",
-
                                 ),
-
-                                html.Div("VÃ¦lg stÃ¸rrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
-
+                                html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                 dcc.Dropdown(
-
                                     data.size_options,
-
                                     id="size_metric",
-
                                     value="optagne",
-
                                     clearable=False,
-
                                     style=dropdown_style,
-
                                     className="dark-dropdown",
-
                                 ),
-
                                 html.Div("Drill-down plots (click a celle for detaljer):", style={"marginBottom": "6px", "fontWeight": "600", "marginTop": "10px"}),
-
                             ],
-
                             style={**CUSTOM_CARD, "marginBottom": "10px"},
-
                         ),
 
                         html.Div(
-
                             [
-
                                 dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
-
                                 html.Div(
-
                                     id="treemap_overlay",
-
                                     style={
-
                                         "position": "absolute",
-
                                         "display": "none",
-
                                         "pointerEvents": "auto",
-
                                         "zIndex": 5,
-
                                         "top": 0,
-
                                         "left": 0,
-
                                     },
-
                                 ),
-
                             ],
-
                             style={"position": "relative"},
-
                         ),
 
                         html.Div(
-
                             [
-
                                 html.Div(
-
                                     [
-
                                         html.Div(
-
                                             TREEMAP_PROMPT,
-
                                             id="treemap_pending_label",
-
                                             style={"flex": "1"},
-
                                         ),
-
                                         html.Button(
-
-                                            "TilfÃ¸j til sammenligning",
-
+                                            "Tilføj til sammenligning",
                                             id="treemap_add",
-
                                             disabled=True,
-
                                             style={
-
                                                 "padding": "6px 14px",
-
                                                 "backgroundColor": "#2b8a3e",
-
                                                 "color": "#fff",
-
                                                 "border": "none",
-
                                                 "borderRadius": "4px",
-
                                                 "cursor": "pointer",
-
                                             },
-
                                         ),
-
                                     ],
-
                                     style={
-
                                         "display": "flex",
-
                                         "gap": "10px",
-
                                         "alignItems": "center",
-
                                         "flexWrap": "wrap",
-
                                         "marginBottom": "10px",
-
                                     },
-
                                 ),
 
                                 html.Div("Valgte uddannelser:", style={"fontWeight": "600", "marginBottom": "6px"}),
-
                                 html.Div(
-
                                     render_selection_rows([None]*MAX_SELECTIONS),
-
                                     id="selection_summary_text",
-
                                     style={"marginBottom": "10px", "lineHeight": "1.5"},
-
                                 ),
-
                                 html.Button(
-
                                     "Ryd valg",
-
                                     id="clear_selections",
-
                                     style={
-
                                         "alignSelf": "flex-start",
-
                                         "padding": "6px 14px",
-
                                         "backgroundColor": "#444d5c",
-
                                         "color": "#fff",
-
                                         "border": "none",
-
                                         "borderRadius": "4px",
-
                                     },
-
                                 ),
-
                             ],
-
                             style={**CUSTOM_CARD, "marginTop": "10px"},
-
                         ),
-
                     ],
-
                     style={"flex": "1 1 1100px", "minWidth": "640px"},
-
                 ),
-
             ],
-
             style={"display": "flex", "gap": "16px", "alignItems": "flex-start", "flexWrap": "wrap"},
-
         ),
 
         html.Div(
@@ -461,89 +250,47 @@ app.layout = html.Div(
         ),
 
         html.Hr(style={"borderColor": "var(--divider)"}),
-
         html.Div(
-
             [
-
                 html.Div(
-
                     [
-
-                        html.Div("VÃ¦lg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
-
+                        html.Div("Vælg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
-
                             parcoord_options,
-
                             id="parcoord_vars",
-
                             value=parcoord_default,
-
                             multi=True,
-
-                            placeholder="VÃ¦lg variabler",
-
+                            placeholder="Vælg variabler",
                             style={
-
                                 "marginBottom": "12px",
-
                                 "backgroundColor": "var(--control-bg)",
-
                                 "color": FONT_COL,
-
                                 "border": "1px solid var(--control-border)",
-
                             },
-
                             className="dark-dropdown",
-
                         ),
-
                         html.Div(id="parcoord_legend", style={"marginBottom": "12px"}),
-
                         html.Iframe(
-
                             id="parallel_plot",
-
                             style={
-
                                 "width": "100%",
-
                                 "height": "640px",  #Change Parallel coordinates plot size here 
-
                                 "border": "0",
-
                                 "backgroundColor": CUSTOM_BG,
-
                             },
-
                         ),
-
                     ],
-
                     style={"flex": "4 1 0px", "minWidth": "620px", **CUSTOM_CARD},
-
                 ),
-
                 html.Div(
-
                     [
-
                         html.Div("Filtrer med intervaller:", style={"fontWeight": "600", "marginBottom": "6px"}),
-
                         html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
-
                     ],
-
                     style={"flex": "1 1 220px", "minWidth": "220px", **CUSTOM_CARD},
-
                 ),
-
             ],
-
             style={"display": "flex", "gap": "16px", "alignItems": "stretch", "flexWrap": "wrap"},
-
         ),
 
         html.Hr(style={"borderColor": "var(--divider)"}),
@@ -553,120 +300,63 @@ app.layout = html.Div(
         html.Hr(style={"borderColor": "var(--divider)"}),
 
         html.Div(
-
             [
-
                 html.Div(
-
                     [
-
                         html.Div("Detaljer for specifik uddannelse", style={"fontWeight": "600", "marginBottom": "6px"}),
-
                         dcc.Dropdown(
-
                             titles_options,
-
                             id="detail_select",
-
-                            placeholder="VÃ¦lg uddannelse",
-
+                            placeholder="Vælg uddannelse",
                             clearable=True,
-
                             style={
-
                                 "marginBottom": "10px",
-
                                 "backgroundColor": "var(--control-bg)",
-
                                 "color": FONT_COL,
-
                                 "border": "1px solid var(--control-border)",
-
                             },
-
                         ),
-
                         html.Div(id="detail_table", style={"overflowY": "auto"}),
-
                     ],
-
                     style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD},
-
                 ),
-
                 html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})], style={"flex": "1 1 520px", "minWidth": "420px"}),
-
             ],
-
             style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
-
         ),
 
         dcc.Store(id="treemap_pending"),
         dcc.Store(id="parcoord_color_store", data={}),
         dcc.Store(id="parcoord_filters_store", data={}),
         dcc.Store(id="bubble_pending"),
-
     ],
-
 )
-
-
-
 
 
 @app.callback(Output("theme_store", "data"), Input("theme_toggle", "n_clicks"), State("theme_store", "data"), prevent_initial_call=True)
-
 def toggle_theme(n_clicks, current_theme):
-
     if not n_clicks:
-
         raise PreventUpdate
-
     current = current_theme or "dark"
-
     return "light" if current == "dark" else "dark"
 
-
-
-
-
 app.clientside_callback(
-
     """
-
     function(theme) {
-
         const mode = theme || 'dark';
-
         const root = document.documentElement;
-
         if (root) {
-
             root.setAttribute('data-theme', mode);
-
         }
-
         const buttonLabel = mode === 'light' ? 'Skift til mørk tilstand' : 'Skift til lys tilstand';
-
         const statusLabel = mode === 'light' ? 'Lyst tema' : 'Mørkt tema';
-
         return [buttonLabel, statusLabel];
-
     }
-
     """,
-
     Output("theme_toggle", "children"),
-
     Output("theme_status", "children"),
-
     Input("theme_store", "data"),
-
 )
-
-
-
 
 
 @app.callback(
@@ -689,36 +379,21 @@ def update_treemap(city_value, metric_key, *args):
     return build_city_treemap(data, city_value, metric_key, selected, slider_filter, theme)
 
 
-
-
 @app.callback(
-
     Output("treemap_pending", "data"),
-
     Output("treemap_pending_label", "children"),
-
     Output("treemap_add", "disabled"),
-
     Input("treemap", "clickData"),
-
 )
 
 def capture_treemap_selection(click_data):
-
     if not click_data or not click_data.get("points"):
-
         return None, TREEMAP_PROMPT, True
-
     label = click_data["points"][0].get("label")
-
     if not label or label not in data.available_set:
-
         return None, TREEMAP_PROMPT, True
-
-    msg = f"Valgt uddannelse: {label}. Klik pÃ¥ 'TilfÃ¸j til sammenligning' for at fremhÃ¦ve den."
-
+    msg = f"Valgt uddannelse: {label}. Klik på 'Tilføj til sammenligning' for at fremhæve den."
     return label, msg, False
-
 
 @app.callback(
     Output("bubble_pending", "data"),
@@ -969,63 +644,26 @@ def update_selection_bubble(*args):
 
 
 @app.callback(
-
     Output("detail_table", "children"),
-
     Output("detail_map", "figure"),
-
     Input("detail_select", "value"),
-
     Input("theme_store", "data"),
-
 )
 
 def update_detail_panel(edu_title, theme_name):
-
     theme = get_theme(theme_name)
-
     if not edu_title or edu_title not in data.available_set:
-
-        empty_text = html.Div("VÃ¦lg en uddannelse ovenfor for at se detaljer.", style={"color": theme.font})
-
+        empty_text = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color": theme.font})
         empty_map = go.Figure()
-
         empty_map.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
-
         return empty_text, empty_map
-
     table, providers_small = build_detail_table(data, edu_title)
-
     map_fig = build_providers_map(providers_small, theme)
-
     return table, map_fig
 
 
 
-
-
 if __name__ == "__main__":
-
     app.run_server(debug=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
