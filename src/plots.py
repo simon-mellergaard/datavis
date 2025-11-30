@@ -12,17 +12,17 @@ from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.plotting import figure
 from bokeh.resources import CDN
 
-from .helpers import (
+from helpers import (
     ensure_latlon_from_municipality,
     mode_str,
     norm_udbud,
     parse_ref,
     to_num,
 )
-from .theme import DEFAULT_THEME, Theme
+from theme import DEFAULT_THEME, Theme
 
 if TYPE_CHECKING:  # avoid circular import during runtime
-    from .data_loader import DataBundle
+    from data_loader import DataBundle
 
 DETAIL_GROUPS = {
     "Undervisningsform": [

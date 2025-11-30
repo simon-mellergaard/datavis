@@ -7,7 +7,7 @@ from typing import Dict, List, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from .helpers import norm_udbud, parse_ref, to_num
+from helpers import norm_udbud, parse_ref, to_num
 
 
 @dataclass
@@ -28,7 +28,7 @@ class DataBundle:
     raw_lookup: pd.DataFrame
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]  # .../datavis
+BASE_DIR = Path(__file__).resolve().parents[1]  # .../datavis
 DATA_DIR = BASE_DIR / "Data"
 DATA_FILE = DATA_DIR / "DATA_UFM_combined_TEST_AREA_filled_V2.xlsx"
 CLUSTER_FILE = DATA_DIR / "education_cluster_mapping.xlsx"

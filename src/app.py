@@ -34,9 +34,9 @@ import plotly.graph_objects as go
 
 
 
-from .data_loader import load_data
+from data_loader import load_data
 
-from .plots import (
+from plots import (
     PARCOORD_DEFAULT_VARS,
     PARCOORD_LABELS,
     PARCOORD_VARIABLES,
@@ -51,7 +51,7 @@ from .plots import (
     build_selection_bubble,
     build_treemap_drill_chart,
 )
-from .theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
+from theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
 
 
