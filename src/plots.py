@@ -1200,8 +1200,8 @@ def build_selection_bubble(
             dict(
                 titel=title,
                 ledighed_num=float(led.mean()),
-                lon_num=float(lon.mean()),
-                bubble_size=kvote,
+                lon_num=float(kvote),
+                bubble_size=lon.mean(),
                 match_filter=True,  # placeholder
             )
         )

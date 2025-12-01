@@ -95,6 +95,7 @@ dropdown_style = {
     "backgroundColor": "var(--control-bg)",
     "color": FONT_COL,
     "border": "1px solid var(--control-border)",
+    'width': '250px',
 }
 MAX_SELECTIONS = 10
 selection_inputs = [Input(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
@@ -106,80 +107,69 @@ remove_inputs = [Input(f"remove_edu{i}", "n_clicks") for i in range(1, MAX_SELEC
 app.layout = html.Div(
     style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
     children=[
-        dcc.Store(id="theme_store", data="dark", storage_type="local"),
-        html.Div(
-            [
-                html.Div("Mørkt tema", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
-                html.Button(
-                    "Skift til lys tilstand",
-                    id="theme_toggle",
-                    n_clicks=0,
-                    style={
-                        "padding": "6px 12px",
-                        "backgroundColor": "#3b82f6",
-                        "color": "#fff",
-                        "border": "none",
-                        "borderRadius": "6px",
-                        "cursor": "pointer",
-                    },
-                ),
-            ],
+        dcc.Store(id="theme_store", data="light", storage_type="local"),
 
-            style={
-                "display": "flex",
-                "justifyContent": "space-between",
-                "alignItems": "center",
-                "gap": "12px",
-                "marginBottom": "12px",
-            },
-        ),
+        html.H1("Edu-X (Educational explorer dashboard)", style={"marginBottom": "12px"}),
 
         html.Div(
             [
                 html.Div(
                     [
+                        
+                        html.Div("Treemap of educations in Denmark. Click a cell to see details for the education, and add it for comparison.", style={"marginBottom": "6px", "fontWeight": "600", "marginTop": "10px"}),
+                        
                         html.Div(
                             [
-                                html.Div("Filtrer efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
-                                dcc.Dropdown(
-                                    data.city_options,
-                                    id="city_select",
-                                    value="__ALL__",
-                                    clearable=False,
-                                    style=dropdown_style,
-                                    className="dark-dropdown",
+                                html.Div(
+                                    [
+                                        dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
+                                        html.Div(
+                                            id="treemap_overlay",
+                                            style={
+                                                "position": "absolute",
+                                                "display": "none",
+                                                "pointerEvents": "auto",
+                                                "zIndex": 5,
+                                                "top": 0,
+                                                "left": 0,
+                                            },
+                                        ),
+                                    ],
+                                    style={"position": "relative"},
                                 ),
-                                html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
-                                dcc.Dropdown(
-                                    data.size_options,
-                                    id="size_metric",
-                                    value="optagne",
-                                    clearable=False,
-                                    style=dropdown_style,
-                                    className="dark-dropdown",
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            [
+                                                html.Div("Filtrer efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                                dcc.Dropdown(
+                                                    data.city_options,
+                                                    id="city_select",
+                                                    value="__ALL__",
+                                                    clearable=False,
+                                                    style=dropdown_style,
+                                                    className="dark-dropdown",
+                                                ),
+                                            ]
+                                        ),
+                                        html.Div(
+                                            [
+                                                html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                                dcc.Dropdown(
+                                                    data.size_options,
+                                                    id="size_metric",
+                                                    value="optagne",
+                                                    clearable=False,
+                                                    style=dropdown_style,
+                                                    className="dark-dropdown",
+                                                ),
+                                            ]
+                                        ),
+                                    ], #style={**CUSTOM_CARD, "marginBottom": "10px", 'display': 'flex', 'gap': '12px'},
                                 ),
-                                html.Div("Drill-down plots (click a celle for detaljer):", style={"marginBottom": "6px", "fontWeight": "600", "marginTop": "10px"}),
-                            ],
-                            style={**CUSTOM_CARD, "marginBottom": "10px"},
+                            ], style={'display': 'flex', 'gap': '12px'},
                         ),
 
-                        html.Div(
-                            [
-                                dcc.Graph(id="treemap", style={"height": "620px", "width": "100%"}),
-                                html.Div(
-                                    id="treemap_overlay",
-                                    style={
-                                        "position": "absolute",
-                                        "display": "none",
-                                        "pointerEvents": "auto",
-                                        "zIndex": 5,
-                                        "top": 0,
-                                        "left": 0,
-                                    },
-                                ),
-                            ],
-                            style={"position": "relative"},
-                        ),
 
                         html.Div(
                             [
@@ -323,6 +313,33 @@ app.layout = html.Div(
                 html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})], style={"flex": "1 1 520px", "minWidth": "420px"}),
             ],
             style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
+        ),
+
+        html.Div(
+            [
+                html.Div("", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
+                html.Button(
+                    "Skift til lys tilstand",
+                    id="theme_toggle",
+                    n_clicks=0,
+                    style={
+                        "padding": "6px 12px",
+                        "backgroundColor": "#3b82f6",
+                        "color": "#fff",
+                        "border": "none",
+                        "borderRadius": "6px",
+                        "cursor": "pointer",
+                    },
+                ),
+            ],
+
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "gap": "12px",
+                "marginBottom": "12px",
+            },
         ),
 
         dcc.Store(id="treemap_pending"),
