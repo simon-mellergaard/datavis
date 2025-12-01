@@ -135,7 +135,7 @@ app.layout = html.Div(
                                             },
                                         ),
                                     ],
-                                    style={"position": "relative"},
+                                    style={"position": "relative", "width": "100%"},
                                 ),
                                 html.Div(
                                     [
