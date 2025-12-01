@@ -45,7 +45,7 @@ THEMES: dict[str, Theme] = {
         muted_text="#475569",
         template="plotly_white",
         root_fill="#e2e8f0",
-        text_on_dark="#0f172a",
+        text_on_dark="#f8f9ff",
         text_on_light="#0f172a",
     ),
 }

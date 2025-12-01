@@ -12,7 +12,7 @@
 }
 
 :root[data-theme='dark'] {
-  --app-bg: #0f1115;
+  --app-bg: #232529;
   --plot-bg: #0f1115;
   --text-color: #ffffff;
   --muted-text: #adb5c6;
@@ -24,7 +24,7 @@
 }
 
 :root[data-theme='light'] {
-  --app-bg: #f8fafc;
+  --app-bg: #dbdbdb;
   --plot-bg: #ffffff;
   --text-color: #0f172a;
   --muted-text: #475569;

@@ -105,19 +105,46 @@ remove_inputs = [Input(f"remove_edu{i}", "n_clicks") for i in range(1, MAX_SELEC
 
 
 app.layout = html.Div(
-    style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh"},
+    style={"padding": "12px", "backgroundColor": CUSTOM_BG, "color": FONT_COL, "minHeight": "100vh", "fontFamily": "var(--font-family, Arial, sans-serif)"},
     children=[
         dcc.Store(id="theme_store", data="light", storage_type="local"),
 
-        html.H1("Edu-X (Educational explorer dashboard)", style={"marginBottom": "12px"}),
+        html.Div(
+            [
+                html.H1("EduEx - Educational explorer dashboard", style={"marginBottom": "12px", "width": "100%"}),
+
+                html.Div(
+                    [
+                        html.Div("Lol", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
+                        html.Button(
+                            "Skift til lys tilstand",
+                            id="theme_toggle",
+                            n_clicks=0,
+                            style={
+                                "padding": "6px 12px",
+                                "backgroundColor": "#3b82f6",
+                                "color": "#fff",
+                                "border": "none",
+                                "borderRadius": "6px",
+                                "cursor": "pointer",
+                            },
+                        ),
+                    ],
+                    style={
+                        "display": "flex",
+                        "justifyContent": "space-between",
+                        "alignItems": "center",
+                        "gap": "12px",
+                        "marginBottom": "12px",
+                    },
+                ),
+            ], style={'display': 'flex', 'gap': '12px'},
+        ),
 
         html.Div(
             [
                 html.Div(
                     [
-                        
-                        html.Div("Treemap of educations in Denmark. Click a cell to see details for the education, and add it for comparison.", style={"marginBottom": "6px", "fontWeight": "600", "marginTop": "10px"}),
-                        
                         html.Div(
                             [
                                 html.Div(
@@ -134,11 +161,11 @@ app.layout = html.Div(
                                                 "left": 0,
                                             },
                                         ),
-                                    ],
-                                    style={"position": "relative", "width": "100%"},
+                                    ], style={"position": "relative", "width": "100%"},
                                 ),
                                 html.Div(
                                     [
+                                        html.Div("Treemap of educations in Denmark. Click a cell to see details for the education, and add it for comparison.", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                                         html.Div(
                                             [
                                                 html.Div("Filtrer efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
@@ -165,7 +192,7 @@ app.layout = html.Div(
                                                 ),
                                             ]
                                         ),
-                                    ], #style={**CUSTOM_CARD, "marginBottom": "10px", 'display': 'flex', 'gap': '12px'},
+                                    ], style={'width': '15%'},
                                 ),
                             ], style={'display': 'flex', 'gap': '12px'},
                         ),
@@ -315,32 +342,6 @@ app.layout = html.Div(
             style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
 
-        html.Div(
-            [
-                html.Div("", id="theme_status", style={"fontSize": "14px", "color": "var(--muted-text)"}),
-                html.Button(
-                    "Skift til lys tilstand",
-                    id="theme_toggle",
-                    n_clicks=0,
-                    style={
-                        "padding": "6px 12px",
-                        "backgroundColor": "#3b82f6",
-                        "color": "#fff",
-                        "border": "none",
-                        "borderRadius": "6px",
-                        "cursor": "pointer",
-                    },
-                ),
-            ],
-
-            style={
-                "display": "flex",
-                "justifyContent": "space-between",
-                "alignItems": "center",
-                "gap": "12px",
-                "marginBottom": "12px",
-            },
-        ),
 
         dcc.Store(id="treemap_pending"),
         dcc.Store(id="parcoord_color_store", data={}),
@@ -365,8 +366,8 @@ app.clientside_callback(
         if (root) {
             root.setAttribute('data-theme', mode);
         }
-        const buttonLabel = mode === 'light' ? 'Skift til mørk tilstand' : 'Skift til lys tilstand';
-        const statusLabel = mode === 'light' ? 'Lyst tema' : 'Mørkt tema';
+        const buttonLabel = mode === 'light' ? 'Dark mode' : 'Light mode';
+        const statusLabel = mode === 'light' ? '' : '';
         return [buttonLabel, statusLabel];
     }
     """,
