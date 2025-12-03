@@ -37,7 +37,7 @@ ASSETS_PATH = Path(__file__).resolve().parents[0] / "assets"
 
 app = Dash(__name__, assets_folder=str(ASSETS_PATH))
 
-TREEMAP_PROMPT = "Klik på treemap-cellerne for at vælge en uddannelse."
+TREEMAP_PROMPT = "Click an education cell in the treemap to add it for comparison."
 
 
 def render_selection_rows(values):
@@ -53,16 +53,17 @@ def render_selection_rows(values):
                 [
                     html.Span(label, style={"flex": "1"}),
                     html.Button(
-                        "Fjern",
+                        "🗑",
                         id=f"remove_edu{idx}",
                         n_clicks=0,
                         style={
                             "backgroundColor": "#b02a37",
                             "color": "#fff",
                             "border": "none",
-                            "padding": "4px 10px",
-                            "borderRadius": "4px",
+                            "padding": "3px 9px",
+                            "borderRadius": "6px",
                             "cursor": "pointer",
+                            "fontSize": "18px",
                         },
                     ),
                 ],
@@ -80,7 +81,7 @@ def render_selection_rows(values):
         rows.insert(
             0,
             html.Div(
-                "Ingen uddannelser valgt endnu. Klik på treemap-cellerne og bekræft for at tilføje op til tre.",
+                "No educations selected yet.",
                 style={"color": "var(--muted-text)", "marginBottom": "6px"},
             ),
         )
@@ -168,7 +169,7 @@ app.layout = html.Div(
                                         html.Div("Treemap of educations in Denmark. Click a cell to see details for the education, and add it for comparison.", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                                         html.Div(
                                             [
-                                                html.Div("Filtrer efter kommune:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                                html.Div("Filter by municipality:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                                 dcc.Dropdown(
                                                     data.city_options,
                                                     id="city_select",
@@ -181,7 +182,7 @@ app.layout = html.Div(
                                         ),
                                         html.Div(
                                             [
-                                                html.Div("Vælg størrelse for klynger:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                                html.Div("Select size for areas:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                                 dcc.Dropdown(
                                                     data.size_options,
                                                     id="size_metric",
@@ -192,64 +193,64 @@ app.layout = html.Div(
                                                 ),
                                             ]
                                         ),
+
+
+                                        html.Div(
+                                            [
+                                                html.Div(
+                                                    [
+                                                        html.Div(
+                                                            TREEMAP_PROMPT,
+                                                            id="treemap_pending_label",
+                                                            style={"flex": "1"},
+                                                        ),
+                                                        html.Button(
+                                                            "Add to comparison",
+                                                            id="treemap_add",
+                                                            disabled=True,
+                                                            style={
+                                                                "padding": "6px 14px",
+                                                                "backgroundColor": "#2b8a3e",
+                                                                "color": "#fff",
+                                                                "border": "none",
+                                                                "borderRadius": "4px",
+                                                                "cursor": "pointer",
+                                                            },
+                                                        ),
+                                                    ],
+                                                    style={
+                                                        "display": "flex",
+                                                        "gap": "10px",
+                                                        "alignItems": "center",
+                                                        "flexWrap": "wrap",
+                                                        "marginBottom": "10px",
+                                                    },
+                                                ),
+
+                                                html.Div("Chosen educations:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                                                html.Div(
+                                                    render_selection_rows([None]*MAX_SELECTIONS),
+                                                    id="selection_summary_text",
+                                                    style={"marginBottom": "10px", "lineHeight": "1.5"},
+                                                ),
+                                                html.Button(
+                                                    "Clear selections",
+                                                    id="clear_selections",
+                                                    style={
+                                                        "alignSelf": "flex-start",
+                                                        "padding": "6px 14px",
+                                                        "backgroundColor": "#444d5c",
+                                                        "color": "#fff",
+                                                        "border": "none",
+                                                        "borderRadius": "4px",
+                                                    },
+                                                ),
+                                            ],
+                                            style={**CUSTOM_CARD, "marginTop": "10px"},
+                                        ),
                                     ], style={'width': '15%'},
                                 ),
                             ], style={'display': 'flex', 'gap': '12px'},
-                        ),
-
-
-                        html.Div(
-                            [
-                                html.Div(
-                                    [
-                                        html.Div(
-                                            TREEMAP_PROMPT,
-                                            id="treemap_pending_label",
-                                            style={"flex": "1"},
-                                        ),
-                                        html.Button(
-                                            "Tilføj til sammenligning",
-                                            id="treemap_add",
-                                            disabled=True,
-                                            style={
-                                                "padding": "6px 14px",
-                                                "backgroundColor": "#2b8a3e",
-                                                "color": "#fff",
-                                                "border": "none",
-                                                "borderRadius": "4px",
-                                                "cursor": "pointer",
-                                            },
-                                        ),
-                                    ],
-                                    style={
-                                        "display": "flex",
-                                        "gap": "10px",
-                                        "alignItems": "center",
-                                        "flexWrap": "wrap",
-                                        "marginBottom": "10px",
-                                    },
-                                ),
-
-                                html.Div("Valgte uddannelser:", style={"fontWeight": "600", "marginBottom": "6px"}),
-                                html.Div(
-                                    render_selection_rows([None]*MAX_SELECTIONS),
-                                    id="selection_summary_text",
-                                    style={"marginBottom": "10px", "lineHeight": "1.5"},
-                                ),
-                                html.Button(
-                                    "Ryd valg",
-                                    id="clear_selections",
-                                    style={
-                                        "alignSelf": "flex-start",
-                                        "padding": "6px 14px",
-                                        "backgroundColor": "#444d5c",
-                                        "color": "#fff",
-                                        "border": "none",
-                                        "borderRadius": "4px",
-                                    },
-                                ),
-                            ],
-                            style={**CUSTOM_CARD, "marginTop": "10px"},
                         ),
                     ],
                     style={"flex": "1 1 1100px", "minWidth": "640px"},
@@ -410,7 +411,7 @@ def capture_treemap_selection(click_data):
     label = click_data["points"][0].get("label")
     if not label or label not in data.available_set:
         return None, TREEMAP_PROMPT, True
-    msg = f"Valgt uddannelse: {label}. Klik på 'Tilføj til sammenligning' for at fremhæve den."
+    msg = f"Chosen education: {label}. Click 'Add to comparison' to highlight it."
     return label, msg, False
 
 @app.callback(
