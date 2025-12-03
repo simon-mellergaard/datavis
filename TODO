@@ -1,0 +1,8 @@
+THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
+
+
+* Add tooltip for the variables in parallel coordinates
+* Add gridlines/numbers to the parallel coordinates
+* Fix the text inside the treemap cells to not show % of parent
+* Consider how the bubble chart is best shown
+* Translate all UI to english (not the variables or data themselves)
