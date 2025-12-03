@@ -312,13 +312,15 @@ app.layout = html.Div(
         ),
 
         html.Hr(style={"borderColor": "var(--divider)"}),
-        html.Div("Ledighed vs L?n (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
-        dcc.Graph(id="selection_bubble", style={"height": "460px"}),
-        dcc.ConfirmDialog(id="bubble_confirm"),
-        html.Hr(style={"borderColor": "var(--divider)"}),
-
         html.Div(
             [
+                html.Div(
+                    [
+                        html.Div("Ledighed vs karakterer (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        dcc.Graph(id="selection_bubble", style={"height": "460px"}),
+                        dcc.ConfirmDialog(id="bubble_confirm"),
+                    ], style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD}
+                ), 
                 html.Div(
                     [
                         html.Div("Detaljer for specifik uddannelse", style={"fontWeight": "600", "marginBottom": "6px"}),
@@ -335,12 +337,20 @@ app.layout = html.Div(
                             },
                         ),
                         html.Div(id="detail_table", style={"overflowY": "auto"}),
-                    ],
-                    style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD},
+                    ], style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD},
                 ),
+            ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}
+        ), 
+        
+        
+        
+        html.Hr(style={"borderColor": "var(--divider)"}),
+
+        html.Div(
+            [
+
                 html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})], style={"flex": "1 1 520px", "minWidth": "420px"}),
-            ],
-            style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
+            ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
 
 
