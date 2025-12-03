@@ -272,13 +272,13 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.Div("Vælg variabler til parallelle koordinater:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("Select variables of your interest:", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
                             parcoord_options,
                             id="parcoord_vars",
                             value=parcoord_default,
                             multi=True,
-                            placeholder="Vælg variabler",
+                            placeholder="Choose variables to display",
                             style={
                                 "marginBottom": "12px",
                                 "backgroundColor": "var(--control-bg)",
@@ -302,7 +302,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
-                        html.Div("Filtrer med intervaller:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("Filter educations by education (Hover for details):", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
                     ],
                     style={"flex": "1 1 220px", "minWidth": "220px", **CUSTOM_CARD},

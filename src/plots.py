@@ -77,8 +77,8 @@ PARCOORD_VARIABLES = [
     "tidsforbrug_arbejde",
     "arbejdstid_timer",
     "ledighed_nyudd",
-    "maanedloen_nyudd",
-    "maanedloen_10aar",
+    # "maanedloen_nyudd",
+    # "maanedloen_10aar",
 ]
 PARCOORD_DEFAULT_VARS = PARCOORD_VARIABLES[:5]
 PARCOORD_LIKERT_COLUMNS = {
@@ -130,6 +130,29 @@ PARCOORD_LABELS: Dict[str, str] = {
     "maanedloen_10aar": "Løn (10 år)",
 }
 
+# Short explanatory tooltips for parallel-coordinate variables (shown on hover)
+PARCOORD_TOOLTIPS: Dict[str, str] = {
+    "fagligmiljo_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Der er et godt fagligt miljø" (5: Helt enig, 1: Helt uenig)',
+    "arbmedstud_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Jeg har det generelt godt med at arbejde sammen med andre studerende" (5: Helt enig, 1: Helt uenig)',
+    "medstuderende_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Jeg forstår tingene bedre, når jeg har talt med mine medstuderende om dem" (5: Helt enig, 1: Helt uenig)',
+    "udbytte_undervisning_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Mit udbytte af undervisningen er højt" (5: Helt enig, 1: Helt uenig)',
+    "socialtmiljo_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Der er et godt socialt miljø" (5: Helt enig, 1: Helt uenig)',
+    "ensom_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Har du oplevet at føle dig ensom på studiet?" (5: Aldrig, 1: Altid)',
+    "stress_daglig_likert": 'Hvor ofte gør følgende sig gældende for dig i forbindelse med dit studie: "Har du oplevet stærke stress-symptomer i forbindelse med dit studie i dagligdagen?" (5: Aldrig, 1: Altid)',
+    "tilpas_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Jeg føler mig generelt godt tilpas på min uddannelse" (5: Helt enig, 1: Helt uenig)',
+    "undervisere_engagerede_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Underviserne virker entusiastiske for det, de underviser i" (5: Helt enig, 1: Helt uenig)',
+    "undervisere_feedback_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Den feedback, jeg får, hjælper mig til at arbejde videre med det, jeg skal lære" (5: Helt enig, 1: Helt uenig)',
+    "undervisere_hjaelp_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Underviserne hjælper os med at forstå, hvordan man tænker og drager konklusioner på uddannelsen" (5: Helt enig, 1: Helt uenig)',
+    "undervisere_kontakt_likert": 'Hvor enig eller uenig er du i følgende udsagn: "Mine undervisere er nemme at komme i kontakt med" (5: Helt enig, 1: Helt uenig)',
+    "afbrud": "Andel der afbryder uddannelsen i løbet af første studieår.",
+    "tidsforbrug_p50": "Typisk tidsforbrug (median) på undervisning, forberedelse og evt. praktik sammenlagt.",
+    "tidsforbrug_arbejde": "Typisk tidsforbrug på arbejde ved siden af studiet (studiejob og frivilligt arbejde lagt sammen)",
+    "arbejdstid_timer": "Gennemsnitlige ugentlige antal arbejdstimer for færdiguddannede.",
+    "ledighed_nyudd": "Gennemsnitlig ledigheden for nyuddannede i 4-7 kvartal efter endt uddannelse.",
+    "maanedloen_nyudd": "Månedlig erhvervsindkomst (median) i andet år efter fuldførelse af ud-dannelser. Afrundet til hele 100 kr.",
+    "maanedloen_10aar": "Månedlig erhvervsindkomst (median) for personer med 10 års anciennitet. Afrundet til hele 100 kr.",
+}
+
 TREEMAP_DRILL_METRICS = [
     ("maanedloen_nyudd", PARCOORD_LABELS["maanedloen_nyudd"]),
     ("ledighed_nyudd", PARCOORD_LABELS["ledighed_nyudd"]),
@@ -161,7 +184,7 @@ def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, s
     titles = [t for t in selected_titles if t]
     if not titles:
         return html.Div(
-            "Ingen uddannelser valgt endnu.",
+            "No educations selected. Select an education in the treemap or bubble chart.",
             style={"color": theme.muted_text, "fontStyle": "italic", "fontSize": "14px"},
         )
 
@@ -180,6 +203,7 @@ def build_parcoord_legend(selected_titles: Iterable[str], color_map: Dict[str, s
         items.append(html.Div([swatch, label], style={"display": "flex", "alignItems": "center"}))
 
     return html.Div(items, style={"display": "flex", "flexWrap": "wrap", "gap": "12px"})
+
 
 
 def build_detail_table(data: DataBundle, edu_title: str):
@@ -773,12 +797,11 @@ def build_parallel_coordinates(
         df = df[df["titel"].isin(allowed_titles)]
     columns = [col for col in selected_vars if col in df.columns]
     if not columns:
-        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>Ingen variabler valgt.</div>"
+        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>No variables chosen.</div>"
 
     df = df.dropna(subset=columns)
     if df.empty:
-        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>Ingen data for de valgte variabler.</div>"
-
+        return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>No data for the selected variables.</div>"
     selected_list = [t for t in selected_titles if t]
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
@@ -843,16 +866,28 @@ def build_parallel_coordinates(
             base_ys.append(values)
             base_titles.append(title)
 
+    # Disable interactive pan/drag by not providing any active tools.
+    # HoverTool is added later via `add_tools` so it will still work.
     p = figure(
         height=640,
         sizing_mode="stretch_width",
-        x_range=(-0.5, len(columns) - 0.5),
-        y_range=(0, 1),
+        x_range=(-0.2, len(columns) - 0.8),
+        y_range=(-0.1, 1.1),
         toolbar_location=None,
+        tools="",
         background_fill_color=theme.app_bg,
         border_fill_color=theme.app_bg,
     )
+    p.grid.grid_line_color = theme.card_border
     p.grid.visible = False
+    # Ensure no drag/scroll tool is active even if a toolbar exists
+    try:
+        if getattr(p, "toolbar", None) is not None:
+            p.toolbar.active_drag = None
+            p.toolbar.active_scroll = None
+    except Exception:
+        # Be conservative: if toolbar attributes aren't available, ignore.
+        pass
     p.yaxis.visible = False
     p.xaxis.ticker = list(range(len(columns)))
     p.xaxis.major_label_overrides = {i: PARCOORD_LABELS.get(col, col) for i, col in enumerate(columns)}
@@ -865,6 +900,26 @@ def build_parallel_coordinates(
         lo, hi = axis_ranges[col]
         p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
         p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
+        # For likert-style axes, draw horizontal gridlines at ticks (2..5).
+        # Only label the tick numbers on the left-most axis.
+        if col in PARCOORD_LIKERT_COLUMNS:
+            for tick in (2, 3, 4, 5):
+                try:
+                    y_pos = normalize(float(tick), axis_ranges[col])
+                except Exception:
+                    y_pos = (float(tick) - lo) / max(hi - lo, 1e-9)
+                # draw a horizontal gridline aligned with the tick
+                p.segment(x0=-0.5, y0=y_pos, x1=len(columns) - 0.5, y1=y_pos, line_color=theme.card_border, line_alpha=0.25)
+                # label numbers only on the left-most axis (slightly left of it)
+                if idx == 0:
+                    p.text(
+                        x=-0.1,
+                        y=y_pos,
+                        text=[str(tick)],
+                        text_align="right",
+                        text_color=theme.font,
+                        text_font_size="15px",
+                    )
 
     hover_renderers = []
     if base_xs:
@@ -942,9 +997,12 @@ def build_parcoord_sliders(
             tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
         )
+        # Use a label with a `title` so hovering shows a tooltip with a short explanation.
+        label_text = PARCOORD_LABELS.get(col, col)
+        label_tooltip = PARCOORD_TOOLTIPS.get(col, "")
         components.append(
             html.Div(
-                [html.Label(PARCOORD_LABELS.get(col, col)), slider],
+                [html.Label(label_text, title=label_tooltip), slider],
                 style={"marginBottom": "16px"},
             )
         )
@@ -1079,26 +1137,8 @@ def build_selection_bubble(
     bg_mask = ~fg_mask
     show_background = not bool(slider_filter)
 
-    if fg_mask.any():
-        fig.add_trace(
-            go.Scatter(
-                y=agg.loc[fg_mask, "ledighed_num"],
-                x=agg.loc[fg_mask, "lon_num"],
-                mode="markers",
-                text=agg.loc[fg_mask, "titel"],
-                hovertext=[hover_text[i] for i, m in enumerate(fg_mask) if m],
-                hoverinfo="text",
-                marker=dict(
-                    size=np.array(marker_sizes)[fg_mask],
-                    color=np.array(colors)[fg_mask],
-                    opacity=0.9,
-                    line=dict(color=theme.card_border, width=1),
-                ),
-                name="Match",
-                customdata=agg.loc[fg_mask, "titel"],
-            )
-        )
-
+    # Draw background (non-selected) points first so selected/matched points
+    # added later will appear on top.
     if show_background and bg_mask.any():
         fig.add_trace(
             go.Scatter(
@@ -1116,6 +1156,28 @@ def build_selection_bubble(
                 ),
                 name="Andre",
                 customdata=agg.loc[bg_mask, "titel"],
+            )
+        )
+
+    # Foreground: selected or filter matches - added after background so they
+    # render on top and remain visible.
+    if fg_mask.any():
+        fig.add_trace(
+            go.Scatter(
+                y=agg.loc[fg_mask, "ledighed_num"],
+                x=agg.loc[fg_mask, "lon_num"],
+                mode="markers",
+                text=agg.loc[fg_mask, "titel"],
+                hovertext=[hover_text[i] for i, m in enumerate(fg_mask) if m],
+                hoverinfo="text",
+                marker=dict(
+                    size=np.array(marker_sizes)[fg_mask],
+                    color=np.array(colors)[fg_mask],
+                    opacity=0.9,
+                    line=dict(color=theme.card_border, width=1),
+                ),
+                name="Match",
+                customdata=agg.loc[fg_mask, "titel"],
             )
         )
 
