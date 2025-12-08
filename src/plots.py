@@ -259,15 +259,14 @@ def build_detail_table(data: DataBundle, edu_title: str):
         value = metric_value(column, how)
         display = formatter(value) if value is not None else "N/A"
         rows.append(html.Tr([html.Th(label), html.Td(display)]))
-    if any(strings.values()):
-        rows.append(
-            html.Tr(
-                [
-                    html.Th("Første job (typisk)"),
-                    html.Td(", ".join([s for s in strings.values() if s])),
-                ]
-            )
-        )
+    # Show each listed "Første job" on its own row instead of joining them
+    jobs = [s for s in strings.values() if s]
+    if jobs:
+        # Header row with the first job
+        rows.append(html.Tr([html.Th("Første job (typisk)"), html.Td(jobs[0])]))
+        # Additional jobs on their own rows with an empty first cell for alignment
+        for job in jobs[1:]:
+            rows.append(html.Tr([html.Th(""), html.Td(job)]))
 
     ug_link = first_link(providers, "url") or (first_link(overview, "url") if not overview.empty else None)
     if ug_link:
