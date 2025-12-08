@@ -1140,11 +1140,16 @@ def build_selection_bubble(
     agg["match_filter"] = agg.apply(matches_slider_row, axis=1)
 
     sizes = agg["bubble_size"].astype(float)
-    size_min, size_max = sizes.min(), sizes.max()
-    if np.isclose(size_min, size_max):
-        marker_sizes = [38 for _ in sizes]
+    min_diam, max_diam = 26.0, 96.0
+    min_area = (min_diam / 2) ** 2 * np.pi
+    max_area = (max_diam / 2) ** 2 * np.pi
+    if np.isclose(sizes.min(), sizes.max()):
+        marker_sizes = [0.5 * (min_diam + max_diam) for _ in sizes]
     else:
-        marker_sizes = 26 + 70 * (sizes - size_min) / max(size_max - size_min, 1e-9)
+        # Direct area proportional to value, then clamp to min/max pixel areas.
+        areas = (sizes / sizes.max()) * max_area
+        areas = np.clip(areas, min_area, max_area)
+        marker_sizes = 2 * np.sqrt(areas / np.pi)  # convert area back to diameter for Plotly
 
     colors = []
     for t, match in zip(agg["titel"], agg["match_filter"]):
