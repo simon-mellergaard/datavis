@@ -448,8 +448,9 @@ def prompt_add_from_bubble(click_data, *values):
     Input("treemap", "clickData"),
     Input("city_select", "value"),
     Input("theme_store", "data"),
+    Input("treemap_add", "n_clicks"),
 )
-def show_treemap_drill(click_data, city_value, theme_name):
+def show_treemap_drill(click_data, city_value, theme_name, add_clicks):
 
     base_style = {
         "position": "absolute",
@@ -463,6 +464,10 @@ def show_treemap_drill(click_data, city_value, theme_name):
         "borderRadius": "8px",
         "boxShadow": "0 8px 20px rgba(0,0,0,0.35)",
     }
+
+    # Hide the drill overlay once the education has been added to the comparison list.
+    if callback_context.triggered and callback_context.triggered[0]["prop_id"].startswith("treemap_add"):
+        return None, base_style
 
     if not click_data or not click_data.get("points"):
         return None, base_style
