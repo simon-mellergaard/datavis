@@ -6,8 +6,6 @@ Docs document for ideas: https://docs.google.com/document/d/1nLFQZClVa5o1IPiKs25
 
 Project report: https://aarhusuniversitet-my.sharepoint.com/:w:/r/personal/au684061_uni_au_dk/_layouts/15/doc2.aspx?sourcedoc=%7B466638CC-5163-4365-AC33-032BF5DD698E%7D&file=Report.docx&wdOrigin=OFFICECOM-WEB.MAIN.EDGEWORTH&fromShare=true&action=default&mobileredirect=true
 
-![dallas](/dallas%205.jpg)
-
 # Requirements for the project (from Brightspace)
 
 An important part of the Data Visualization course is the semester-long course project. In this project, you will develop an interactive data visualization for a dataset of your own choosing. There are many good reasons for such a practical project running alongside the course – some of which are:
