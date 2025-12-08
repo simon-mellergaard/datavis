@@ -1,7 +1,7 @@
 THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
-* Change sliders in parallel coordinates, so that each the min and max is corresponding to the min and max of the variable (William)
 * Add option to scale parallel coordinates to min and max.
+* Map chart???
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
 * EVT extra: Further work needed with the barcharts along with adding additional information
@@ -9,6 +9,7 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
 ###################### DONE ######################################### 
 
+* Change sliders in parallel coordinates, so that each the min and max is corresponding to the min and max of the variable (William)
 * Remove masters educations. (Jonas)
 * Add tooltip for the variables in parallel coordinates
 * Add gridlines/numbers to the parallel coordinates

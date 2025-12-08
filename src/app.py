@@ -25,7 +25,6 @@ from plots import (
     build_parcoord_legend,
     build_parcoord_sliders,
     build_parallel_coordinates,
-    build_providers_map,
     build_selection_bubble,
     build_treemap_drill_chart,
     build_leaflet_map,

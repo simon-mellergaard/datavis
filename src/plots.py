@@ -327,88 +327,6 @@ def build_detail_table(data: DataBundle, edu_title: str):
     return table, providers_small
 
 
-def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) -> go.Figure:
-    theme = theme or DEFAULT_THEME
-    if providers_df.empty:
-        fig = go.Figure()
-        fig.update_layout(
-            template=theme.template,
-            paper_bgcolor=theme.app_bg,
-            plot_bgcolor=theme.plot_bg,
-            margin=dict(t=0, l=0, r=0, b=0),
-            font_color=theme.font,
-        )
-        return fig
-
-    providers_geo = ensure_latlon_from_municipality(providers_df)
-    if "kvote_1_kvotient" in providers_geo.columns:
-        providers_geo["kvote_num"] = to_num(providers_geo["kvote_1_kvotient"])
-    if "standby_8" in providers_geo.columns:
-        providers_geo["standby_num"] = to_num(providers_geo["standby_8"])
-
-    providers_geo = providers_geo.dropna(subset=["inst_lat", "inst_lon"])
-    if providers_geo.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="Ingen koordinater og ingen kendt kommune-match.",
-            showarrow=False,
-            font=dict(color=theme.font, size=12),
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-        )
-        fig.update_layout(
-            template=theme.template,
-            paper_bgcolor=theme.app_bg,
-            plot_bgcolor=theme.plot_bg,
-            margin=dict(t=0, l=0, r=0, b=0),
-            font_color=theme.font,
-        )
-        return fig
-
-    hover_cols = [
-        col
-        for col in ["instkommunetx", "instregiontx", "titel", "kvote_num", "standby_num"]
-        if col in providers_geo.columns
-    ]
-    fig = px.scatter_mapbox(
-        providers_geo,
-        lat="inst_lat",
-        lon="inst_lon",
-        hover_name="hovedinsttx",
-        hover_data=hover_cols,
-        zoom=6,
-        height=520,
-    )
-    fig.update_traces(marker=dict(size=14))  # make provider dots easier to see
-
-    latitudes = providers_geo["inst_lat"].astype(float)
-    longitudes = providers_geo["inst_lon"].astype(float)
-    lat_span = float(latitudes.max() - latitudes.min()) if len(latitudes) else 0.0
-    lon_span = float(longitudes.max() - longitudes.min()) if len(longitudes) else 0.0
-    center_lat = float(latitudes.mean()) if len(latitudes) else 56.0
-    center_lon = float(longitudes.mean()) if len(longitudes) else 10.5
-
-    zoom = 6.0
-    span = max(lat_span, lon_span)
-    if span < 0.8:
-        zoom = 7.5
-    elif span > 6:
-        zoom = 5.2
-
-    fig.update_layout(
-        mapbox_style="open-street-map",
-        mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
-        template=theme.template,
-        paper_bgcolor=theme.app_bg,
-        plot_bgcolor=theme.plot_bg,
-        font_color=theme.font,
-        margin=dict(t=0, l=0, r=0, b=0),
-    )
-    return fig
-
-
 def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
     """Simplified map for provider locations using dash-leaflet."""
     theme = theme or DEFAULT_THEME
@@ -908,6 +826,12 @@ def build_city_treemap(
     )
     marker_dict["cmin"] = marker_cmin
     marker_dict["cmax"] = marker_cmax
+    # Ensure treemap rectangles have a clear border color (theme-specific)
+    try:
+        marker_dict["line"] = dict(color=theme.treemap_border, width=0.6)
+    except Exception:
+        # Fallback to card border if the theme doesn't provide treemap_border
+        marker_dict["line"] = dict(color=theme.card_border, width=0.6)
 
     fig = go.Figure(
         go.Treemap(
@@ -971,12 +895,20 @@ def build_parallel_coordinates(
     axis_ranges: Dict[str, Tuple[float, float]] = {}
     scaling_df = df.copy().dropna(subset=columns)
     for col in columns:
-        series = scaling_df[col].astype(float)
-        vmin = float(series.min())
-        vmax = float(series.max())
-        if np.isclose(vmin, vmax):
-            vmax = vmin + 0.1
-        axis_ranges[col] = (vmin, vmax)
+        if scale_mode == "DYNAMIC_SCALE":
+            # Dynamic Scale: Axis range = Variable's min/max in filtered data
+            series = scaling_df[col].astype(float)
+            vmin = float(series.min())
+            vmax = float(series.max())
+            
+            if np.isclose(vmin, vmax):
+                vmax = vmin + 1.0
+            
+            axis_ranges[col] = (vmin, vmax)
+            
+        else: # scale_mode == "FIXED_SCALE" (Default)
+            # Fixed Scale: Axis range = Fixed 2.0 to 5.0
+            axis_ranges[col] = (2.0, 5.0) 
     # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
