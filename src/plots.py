@@ -244,6 +244,13 @@ def build_detail_table(data: DataBundle, edu_title: str):
             return float(series.sum()) if how == "sum" else float(series.mean())
         return None
 
+    def first_link(frame: pd.DataFrame, column: str):
+        if column not in frame.columns:
+            return None
+        series = frame[column].dropna().astype(str).str.strip()
+        series = series[series != ""]
+        return series.iloc[0] if not series.empty else None
+
     rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
     for column, label, how, formatter in DETAIL_OVERVIEW_SPECS:
         value = metric_value(column, how)
@@ -255,6 +262,28 @@ def build_detail_table(data: DataBundle, edu_title: str):
                 [
                     html.Th("Første job (typisk)"),
                     html.Td(", ".join([s for s in strings.values() if s])),
+                ]
+            )
+        )
+
+    ug_link = first_link(providers, "url") or (first_link(overview, "url") if not overview.empty else None)
+    if ug_link:
+        ug_link = ug_link.strip()
+        if not ug_link.lower().startswith(("http://", "https://")):
+            ug_link = f"https://{ug_link}"
+        rows.append(
+            html.Tr(
+                [
+                    html.Th("UG.dk"),
+                    html.Td(
+                        html.A(
+                            "Åbn på UG.dk",
+                            href=ug_link,
+                            target="_blank",
+                            rel="noopener noreferrer",
+                            style={"color": "#0d6efd"},
+                        )
+                    ),
                 ]
             )
         )
