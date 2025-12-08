@@ -626,6 +626,7 @@ def build_treemap_drill_chart(
             x=df_plot["label"],
             y=df_plot[value_col],
             orientation="v",
+            width=0.35,  # slightly narrower bars for clearer spacing
             marker=dict(color=colors, line=dict(color=theme.card_border, width=0.5)),
             customdata=df_plot["provider"],
             hovertemplate="%{customdata}<br>" + label + ": %{y:.2f}<extra></extra>",
@@ -658,7 +659,7 @@ def build_treemap_drill_chart(
             dtick=1 if metric_key in likert_metrics else None,
         ),
         showlegend=False,
-        bargap=0.4,
+        bargap=0.45,
     )
     return fig
 
@@ -888,24 +889,19 @@ def build_parallel_coordinates(
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
     # --- AXIS RANGE CALCULATION ---
-    # Use data-driven min/max per variable (respecting allowed_titles), with a tiny pad when identical.
+    # Scale axes either to data min/max (DATA_SCALE) or fixed Likert range 2-5 (FIXED_SCALE).
     axis_ranges: Dict[str, Tuple[float, float]] = {}
     scaling_df = df.copy().dropna(subset=columns)
     for col in columns:
-        if scale_mode == "DYNAMIC_SCALE":
-            # Dynamic Scale: Axis range = Variable's min/max in filtered data
-            series = scaling_df[col].astype(float)
-            vmin = float(series.min())
-            vmax = float(series.max())
-            
-            if np.isclose(vmin, vmax):
-                vmax = vmin + 1.0
-            
-            axis_ranges[col] = (vmin, vmax)
-            
-        else: # scale_mode == "FIXED_SCALE" (Default)
-            # Fixed Scale: Axis range = Fixed 2.0 to 5.0
-            axis_ranges[col] = (2.0, 5.0) 
+        if scale_mode == "FIXED_SCALE":
+            axis_ranges[col] = (2.0, 5.0)
+            continue
+        series = scaling_df[col].astype(float)
+        vmin = float(series.min())
+        vmax = float(series.max())
+        if np.isclose(vmin, vmax):
+            vmax = vmin + 0.1  # small pad so the axis has a span
+        axis_ranges[col] = (vmin, vmax)
     # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
@@ -1275,9 +1271,10 @@ def build_selection_bubble(
     if np.isclose(sizes.min(), sizes.max()):
         marker_sizes = [0.5 * (min_diam + max_diam) for _ in sizes]
     else:
-        # Direct area proportional to value, then clamp to min/max pixel areas.
-        areas = (sizes / sizes.max()) * max_area
-        areas = np.clip(areas, min_area, max_area)
+        # Scale bubble area linearly between the min and max salary to avoid “flattening” mid-range values.
+        span = sizes.max() - sizes.min()
+        norm = (sizes - sizes.min()) / span
+        areas = min_area + norm * (max_area - min_area)
         marker_sizes = 2 * np.sqrt(areas / np.pi)  # convert area back to diameter for Plotly
 
     colors = []
