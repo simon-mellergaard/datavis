@@ -169,7 +169,7 @@ app.layout = html.Div(
                                         html.Div("Treemap of educations in Denmark. Click a cell to see details for the education, and add it for comparison.", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                                         html.Div(
                                             [
-                                                html.Div("Filter by municipality:", style={"marginBottom": "6px", "fontWeight": "600"}),
+                                                html.Div("Filter by cities:", style={"marginBottom": "6px", "fontWeight": "600"}),
                                                 dcc.Dropdown(
                                                     data.city_options,
                                                     id="city_select",
@@ -302,6 +302,11 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
+                        html.Div("""The plot shows the variables across all
+educations in that specific city, or educations on national level. The sliders
+highlight the educations that match the selected criteria, and are shown in the
+bubble chart below. Hover over the name of the slider name to view details for the
+likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                         html.Div("Filter educations by education (Hover for details):", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
                     ],
