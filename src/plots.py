@@ -1342,7 +1342,7 @@ def build_selection_bubble(
     agg["match_filter"] = agg.apply(matches_slider_row, axis=1)
 
     sizes = agg["bubble_size"].astype(float)
-    min_diam, max_diam = 26.0, 96.0
+    min_diam, max_diam = 10.0, 50.0
     min_area = (min_diam / 2) ** 2 * np.pi
     max_area = (max_diam / 2) ** 2 * np.pi
     if np.isclose(sizes.min(), sizes.max()):
