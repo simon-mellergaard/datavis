@@ -940,32 +940,45 @@ def build_parallel_coordinates(
     color_map: Dict[str, str],
     theme: Theme | None = None,
     allowed_titles: set[str] | None = None,
+    scale_mode: str = "FIXED_SCALE",
 ) -> str:
     theme = theme or DEFAULT_THEME
+    
     df = data.df.copy().dropna(subset=["titel"])
     if allowed_titles is not None:
         df = df[df["titel"].isin(allowed_titles)]
     columns = [col for col in selected_vars if col in df.columns]
+    
     if not columns:
         return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>No variables chosen.</div>"
 
     df = df.dropna(subset=columns)
     if df.empty:
         return f"<div style='color:{theme.font};background-color:{theme.app_bg};padding:16px'>No data for the selected variables.</div>"
+
     selected_list = [t for t in selected_titles if t]
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
+    # --- AXIS RANGE CALCULATION SWITCH ---
+    scaling_df = df.copy().dropna(subset=columns)
     axis_ranges: Dict[str, Tuple[float, float]] = {}
+    
     for col in columns:
-        if col in PARCOORD_LIKERT_COLUMNS:
-            axis_ranges[col] = (2.0, 5.0)
-        else:
-            series = df[col].astype(float)
+        if scale_mode == "DYNAMIC_SCALE":
+            # Dynamic Scale: Axis range = Variable's min/max in filtered data
+            series = scaling_df[col].astype(float)
             vmin = float(series.min())
             vmax = float(series.max())
+            
             if np.isclose(vmin, vmax):
                 vmax = vmin + 1.0
+            
             axis_ranges[col] = (vmin, vmax)
+            
+        else: # scale_mode == "FIXED_SCALE" (Default)
+            # Fixed Scale: Axis range = Fixed 1.0 to 5.0
+            axis_ranges[col] = (1.0, 5.0) 
+    # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
         """Normalizes a value to the [0.0, 1.0] range based on axis bounds."""
@@ -980,18 +993,15 @@ def build_parallel_coordinates(
     def matches_slider(row):
         """Checks if a row's values fall within the active slider filters."""
         if not slider_filter:
-            # If the slider_filter is empty, we consider it a match to show everything.
             return True
         for col, (lo, hi) in slider_filter.items():
             val = row.get(col)
-            # Check for NaN or if value is outside the [lo, hi] range
             if pd.isna(val) or val < lo or val > hi:
                 return False
         return True
 
     xs_template = list(range(len(columns)))
     
-    # base_xs, base_ys, base_titles lists are REMOVED as they are no longer populated.
     filtered_xs: List[List[int]] = []
     filtered_ys: List[List[float]] = []
     filtered_titles: List[str] = []
@@ -1001,31 +1011,28 @@ def build_parallel_coordinates(
     selected_titles_list: List[str] = []
     selected_values_list: List[List[float]] = []
 
-    # --- CORE ITERATION LOGIC: ONLY POPULATE SELECTED OR FILTERED ---
+    # --- CORE ITERATION LOGIC ---
     for _, row in df.iterrows():
         title = str(row["titel"])
         norm_map = row_values(row)
         values = [norm_map[col] for col in columns]
+        raw_values = [float(row[col]) for col in columns] 
         
         is_selected = title in selected_list
         is_filtered = matches_slider(row)
         
         if is_selected:
-            # Selected: Always shown, using categorical color
             selected_xs.append(xs_template[:])
             selected_ys.append(values)
             selected_colors.append(color_map.get(title, "#ff6b6b"))
             selected_titles_list.append(title)
-            selected_values_list.append([float(row[col]) for col in columns])
+            selected_values_list.append(raw_values)
         elif is_filtered:
-            # Filtered (but NOT Selected): Shown using the subtle grey color
             filtered_xs.append(xs_template[:])
             filtered_ys.append(values)
             filtered_titles.append(title)
-        # ELSE: (Not selected AND does not match slider filter) -> IGNORED.
         
-    # Disable interactive pan/drag by not providing any active tools.
-    # HoverTool is added later via `add_tools` so it will still work.
+    # --- PLOT SETUP ---
     p = figure(
         height=640,
         sizing_mode="stretch_width",
@@ -1038,14 +1045,13 @@ def build_parallel_coordinates(
     )
     p.grid.grid_line_color = theme.card_border
     p.grid.visible = False
-    # Ensure no drag/scroll tool is active even if a toolbar exists
     try:
         if getattr(p, "toolbar", None) is not None:
             p.toolbar.active_drag = None
             p.toolbar.active_scroll = None
     except Exception:
-        # Be conservative: if toolbar attributes aren't available, ignore.
         pass
+        
     p.yaxis.visible = False
     p.xaxis.ticker = list(range(len(columns)))
     p.xaxis.major_label_overrides = {i: PARCOORD_LABELS.get(col, col) for i, col in enumerate(columns)}
@@ -1053,53 +1059,51 @@ def build_parallel_coordinates(
     p.xaxis.major_tick_line_color = theme.card_border
     p.xaxis.axis_line_color = theme.card_border
 
+    # --- AXIS LINES AND LABELS ---
     for idx, col in enumerate(columns):
-        # Vertical axis line segments
         p.segment(x0=idx, y0=0, x1=idx, y1=1, line_color=theme.card_border, line_alpha=0.4)
         lo, hi = axis_ranges[col]
-        # Axis labels (max/min)
-        p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
-        p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
         
-        # Likert-style axis gridlines and labels
-        if col in PARCOORD_LIKERT_COLUMNS:
-            for tick in (2, 3, 4, 5):
-                try:
+        # Format string for labels
+        format_str = ".1f" if scale_mode == "FIXED_SCALE" else ".2f"
+        
+        # Axis labels (max/min)
+        p.text(x=idx, y=1.03, text=[f"{hi:{format_str}}"], text_align="center", text_color=theme.font, text_font_size="10px")
+        p.text(x=idx, y=-0.06, text=[f"{lo:{format_str}}"], text_align="center", text_color=theme.font, text_font_size="10px")
+        
+        # Likert-style axis gridlines and labels (only in Fixed Scale mode)
+        if scale_mode == "FIXED_SCALE":
+            for tick in (2, 3, 4):
+                if tick >= lo and tick <= hi:
                     y_pos = normalize(float(tick), axis_ranges[col])
-                except Exception:
-                    y_pos = (float(tick) - lo) / max(hi - lo, 1e-9)
-                # draw a horizontal gridline aligned with the tick
-                p.segment(x0=-0.5, y0=y_pos, x1=len(columns) - 0.5, y1=y_pos, line_color=theme.card_border, line_alpha=0.25)
-                # label numbers only on the left-most axis (slightly left of it)
-                if idx == 0:
-                    p.text(
-                        x=-0.1,
-                        y=y_pos,
-                        text=[str(tick)],
-                        text_align="right",
-                        text_color=theme.font,
-                        text_font_size="15px",
-                    )
+                    
+                    p.segment(x0=-0.5, y0=y_pos, x1=len(columns) - 0.5, y1=y_pos, line_color=theme.card_border, line_alpha=0.25)
+                    
+                    if idx == 0:
+                        p.text(
+                            x=-0.1,
+                            y=y_pos,
+                            text=[str(tick)],
+                            text_align="right",
+                            text_color=theme.font,
+                            text_font_size="15px",
+                        )
 
     hover_renderers = []
     
-    # --- PLOTTING LOGIC: ONLY FILTERED AND SELECTED LINES ---
-    # Removed the drawing of base_xs entirely.
-    
+    # --- PLOTTING LINES ---
     if filtered_xs:
-        # Filtered lines (non-selected) use the subtle style of the old 'base_xs' for density mapping
         source = ColumnDataSource(dict(xs=filtered_xs, ys=filtered_ys, title=filtered_titles))
         p.multi_line(
             "xs", 
             "ys", 
             source=source, 
-            line_color="#BBBBBB",  # Subtle Grey Color
-            line_alpha=0.18,       # Low Opacity for density build-up
-            line_width=1           # Thin line
+            line_color="#BBBBBB",
+            line_alpha=0.18,
+            line_width=1
         )
     
     if selected_xs:
-        # Selected lines use the categorical color and are drawn on top
         tooltip_texts = []
         for value_list in selected_values_list:
             lines = [f"{PARCOORD_LABELS.get(col, col)}: {val:.2f}" for col, val in zip(columns, value_list)]
