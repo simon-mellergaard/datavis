@@ -8,6 +8,7 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
 * Fjerne variabler som ikke er likert fra paralel coordinates
 * Double check colour blind safety (take a few SS and put into colour blind checker)
+* EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 
 ###################### DONE ######################################### 
 
