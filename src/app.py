@@ -323,6 +323,22 @@ educations in that specific city, or educations on national level. The sliders
 highlight the educations that match the selected criteria, and are shown in the
 bubble chart below. Hover over the name of the slider name to view details for the
 likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
+                        html.Div(
+                            [
+                                html.Label("Axis scale:"),
+                                dcc.RadioItems(
+                                    id="parcoord_scale_mode",
+                                    options=[
+                                        {"label": "Fixed 2-5", "value": "FIXED_SCALE"},
+                                        {"label": "Data min/max", "value": "DATA_SCALE"},
+                                    ],
+                                    value="FIXED_SCALE",
+                                    labelStyle={"marginRight": "12px"},
+                                    style={"marginBottom": "8px"},
+                                ),
+                            ],
+                            style={"marginBottom": "12px"},
+                        ),
                         html.Div("Filter educations by variable (hover for details):", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
                     ],
@@ -652,6 +668,7 @@ def update_selection_summary(*values):
         Input("parcoord_vars", "value"),
         *selection_inputs,
         Input("city_select", "value"),
+        Input("parcoord_scale_mode", "value"),
         Input({"type": "parcoord-slider", "column": ALL}, "value"),
         Input("theme_store", "data"),
     ],
@@ -664,10 +681,11 @@ def update_parallel_plot(*args):
     selected_vars = args[0] if args else None
     selections = list(args[1 : 1 + MAX_SELECTIONS])
     city_value = args[1 + MAX_SELECTIONS] if len(args) > 1 + MAX_SELECTIONS else None
-    slider_values = args[2 + MAX_SELECTIONS] if len(args) > 2 + MAX_SELECTIONS else None
-    theme_name = args[3 + MAX_SELECTIONS] if len(args) > 3 + MAX_SELECTIONS else None
-    slider_ids = args[4 + MAX_SELECTIONS] if len(args) > 4 + MAX_SELECTIONS else None
-    color_store = args[5 + MAX_SELECTIONS] if len(args) > 5 + MAX_SELECTIONS else None
+    scale_mode = args[2 + MAX_SELECTIONS] if len(args) > 2 + MAX_SELECTIONS else "FIXED_SCALE"
+    slider_values = args[3 + MAX_SELECTIONS] if len(args) > 3 + MAX_SELECTIONS else None
+    theme_name = args[4 + MAX_SELECTIONS] if len(args) > 4 + MAX_SELECTIONS else None
+    slider_ids = args[5 + MAX_SELECTIONS] if len(args) > 5 + MAX_SELECTIONS else None
+    color_store = args[6 + MAX_SELECTIONS] if len(args) > 6 + MAX_SELECTIONS else None
 
     theme = get_theme(theme_name)
     allowed_titles = None
@@ -692,7 +710,16 @@ def update_parallel_plot(*args):
     slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles)
     selected_titles = [t for t in selections if t]
     color_map = build_color_map_for_selected(selected_titles, color_store)
-    figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
+    figure_html = build_parallel_coordinates(
+        data,
+        selected_titles,
+        slider_filter,
+        chosen,
+        color_map,
+        theme,
+        allowed_titles,
+        scale_mode,
+    )
     legend = build_parcoord_legend(selected_titles, color_map, theme)
     return figure_html, slider_components, color_map, slider_filter, legend, legend
 
