@@ -1129,17 +1129,34 @@ def build_parallel_coordinates(
 
 
 def build_parcoord_sliders(
-    data: DataBundle,
+    data: Any,  # your DataBundle object
     selected_vars: Iterable[str],
     previous_values: Dict[str, Sequence[float]],
-    allowed_titles: set[str] | None = None,
+    allowed_titles: Set[str] | None = None,
+    likert_columns: Set[str] | None = None,
+    labels: Dict[str, str] | None = None,
+    tooltips: Dict[str, str] | None = None,
 ) -> Tuple[List[html.Div], Dict[str, Sequence[float]]]:
+    """
+    Fixed version – integer marks (3.0, 4.0, 5.0, etc.) are guaranteed to appear.
+    """
+    if likert_columns is None:
+        likert_columns = PARCOORD_LIKERT_COLUMNS
+    if labels is None:
+        labels = PARCOORD_LABELS
+    if tooltips is None:
+        tooltips = PARCOORD_TOOLTIPS
+
     components: List[html.Div] = []
     slider_filter: Dict[str, Sequence[float]] = {}
     df = data.df
-    
+
     if allowed_titles is not None:
         df = df[df["titel"].isin(allowed_titles)]
+
+    def clean_float(x: float) -> float:
+        """Eliminate floating-point precision quirks – always exactly X.0 or X.1 etc."""
+        return round(float(x), 1)
 
     for col in selected_vars:
         if col not in df.columns:
@@ -1148,83 +1165,85 @@ def build_parcoord_sliders(
         series = df[col].dropna().astype(float)
         if series.empty:
             continue
-        
-        # --- DYNAMIC MIN/MAX CALCULATION ---
-        
-        actual_min = float(series.min())
-        actual_max = float(series.max())
 
-        # Handle case where min == max
-        if np.isclose(actual_min, actual_max):
-            actual_max = actual_min + 1.0
-            
-        # 1. Set the range (min/max) based on the data
-        min_val = actual_min
-        max_val = actual_max
-        
-        # 2. Set the step size (Precision)
-        step = 0.1 
-        
-        # 3. Determine marks for display (Including min_val and max_val)
-        
-        # Initialize marks with the endpoints
-        marks = {
-            min_val: f"{min_val:.1f}", # Use .1f for better readability by default
-            max_val: f"{max_val:.1f}"
-        }
+        # ----- Determine clean min/max from data -----
+        min_val = clean_float(series.min())
+        max_val = clean_float(series.max())
 
-        if col in PARCOORD_LIKERT_COLUMNS:
-            # Likert: Add integer marks (1, 2, 3, 4, 5) if they fall within the range
-            # We enforce min/max to be at least 1 and 5 for marking consistency, 
-            # even if data is narrower (the slider min/max still follows the data's true bounds).
-            marking_min = 1
-            marking_max = 5
-            
-            # Use integers for marking positions
-            for i in range(marking_min, marking_max + 1):
-                # Only add marks that fall reasonably within the actual data range
-                if i > min_val + 0.001 and i < max_val - 0.001: 
-                     marks[float(i)] = str(i)
-            
+        if np.isclose(min_val, max_val):
+            max_val = min_val + 0.1
+
+        # ----- Hard-coded overrides (still cleaned) -----
+        if col == "Socialt miljø":
+            min_val = 3.0
+        if col == "Undervisere engagerede":
+            max_val = 5.0
+        if col == "Ensomhed":
+            min_val = 3.0
+        if col == "Feedback":
+            min_val = 3.0
+
+        min_val = clean_float(min_val)
+        max_val = clean_float(max_val)
+        step = 0.1
+
+        # ----- Build marks with guaranteed clean keys -----
+        marks: Dict[float, str] = {}
+        marks[min_val] = f"{min_val:.1f}"
+        marks[max_val] = f"{max_val:.1f}"
+
+        if col in likert_columns:
+            # Likert: show clean integers (1.0, 2.0, ..., 5.0)
+            start = max(1, int(np.floor(min_val)))
+            end = min(5, int(np.ceil(max_val)))
+            for i in range(start, end + 1):
+                key = clean_float(i)          # exactly 3.0, 4.0, 5.0 etc.
+                marks[key] = str(i)           # display as "3", "4", "5" – looks cleaner
+
+            # Optional: always show full 1–5 even if data is narrower
+            # for i in range(1, 6):
+            #     marks[clean_float(i)] = str(i)
         else:
-            # Continuous: Add three intermediate ticks
-            # Use 5 points in linspace to get 3 unique intermediate points
-            ticks = np.linspace(actual_min, actual_max, num=5)
-            
-            # Add intermediate points
-            for t in ticks[1:-1]:
-                # We use .2f for intermediate marks if .1f hides too much info
-                marks[float(f"{t:.2f}")] = f"{t:.2f}"
-            
-        # --- END OF DYNAMIC MIN/MAX CALCULATION ---
-            
+            # Continuous variables – intermediate ticks
+            if max_val - min_val > 0.2:
+                ticks = np.linspace(min_val, max_val, num=5)
+                for t in ticks[1:-1]:
+                    t_clean = clean_float(t)
+                    if not np.isclose(t_clean, min_val) and not np.isclose(t_clean, max_val):
+                        marks[t_clean] = f"{t_clean:.1f}"
+
+        # ----- Current value (with bounds clamping) -----
         default = [min_val, max_val]
         current = list(previous_values.get(col, default))
-        
+        current = [
+            max(min_val, min(max_val, clean_float(current[0]))),
+            max(min_val, min(max_val, clean_float(current[1])))
+        ]
+
+        # ----- Create the slider -----
         slider = dcc.RangeSlider(
             id={"type": "parcoord-slider", "column": col},
             min=min_val,
             max=max_val,
             step=step,
             value=current,
-            marks=marks,  # <-- Now contains the precise min_val and max_val keys
+            marks=marks,
             tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
-            className="dark-slider-track"
+            className="dark-slider-track",
         )
-        
-        # Use a label with a `title` so hovering shows a tooltip with a short explanation.
-        label_text = PARCOORD_LABELS.get(col, col)
-        label_tooltip = PARCOORD_TOOLTIPS.get(col, "")
+
+        label_text = labels.get(col, col)
+        label_tooltip = tooltips.get(col, "")
+
         components.append(
             html.Div(
                 [html.Label(label_text, title=label_tooltip), slider],
                 style={"marginBottom": "16px"},
             )
         )
-        
-        if not np.isclose(current[0], default[0]) or not np.isclose(current[1], default[1]):
-            # Only include the filter if the user has changed it away from the min-max default
+
+        if not (np.isclose(current[0], default[0]) and np.isclose(current[1], default[1])):
             slider_filter[col] = current
 
     return components, slider_filter
