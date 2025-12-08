@@ -98,11 +98,16 @@ dropdown_style = {
     "border": "1px solid var(--control-border)",
     'width': '250px',
 }
-MAX_SELECTIONS = 10
+MAX_SELECTIONS = 6
 selection_inputs = [Input(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
 selection_states = [State(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
 selection_outputs = [Output(f"edu{i}", "value") for i in range(1, MAX_SELECTIONS + 1)]
 remove_inputs = [Input(f"remove_edu{i}", "n_clicks") for i in range(1, MAX_SELECTIONS + 1)]
+selection_error_output = Output("selection_error", "children")
+selection_limit_dialog_outputs = [
+    Output("selection_limit_dialog", "displayed"),
+    Output("selection_limit_dialog", "message"),
+]
 
 
 app.layout = html.Div(
@@ -233,6 +238,11 @@ app.layout = html.Div(
                                                     id="selection_summary_text",
                                                     style={"marginBottom": "10px", "lineHeight": "1.5"},
                                                 ),
+                                                html.Div(
+                                                    "",
+                                                    id="selection_error",
+                                                    style={"color": "#b02a37", "marginBottom": "6px", "fontWeight": "600"},
+                                                ),
                                                 html.Button(
                                                     "Clear selections",
                                                     id="clear_selections",
@@ -244,6 +254,11 @@ app.layout = html.Div(
                                                         "border": "none",
                                                         "borderRadius": "4px",
                                                     },
+                                                ),
+                                                dcc.ConfirmDialog(
+                                                    id="selection_limit_dialog",
+                                                    displayed=False,
+                                                    message="",
                                                 ),
                                             ],
                                             style={**CUSTOM_CARD, "marginTop": "10px"},
@@ -427,15 +442,15 @@ def capture_treemap_selection(click_data, *args):
     selection_values = list(args[:-1]) if args else []
     current_selections = {v for v in selection_values if v}
     ctx = callback_context
+    at_limit = len(current_selections) >= MAX_SELECTIONS
 
     # If the change came from selection updates (e.g., removing an education), clear pending if it no longer exists.
     if ctx.triggered and ctx.triggered[0]["prop_id"].split(".")[0] != "treemap":
         if current_pending and current_pending not in current_selections:
             return None, TREEMAP_PROMPT, True
         if current_pending and current_pending in current_selections:
-            return current_pending, f"{current_pending} is already in the comparison list.", True
-        # No pending selection; keep disabled.
-        return current_pending, TREEMAP_PROMPT if not current_pending else f"Chosen education: {current_pending}. Click 'Add to comparison' to highlight it.", not bool(current_pending)
+            return current_pending, TREEMAP_PROMPT, True
+        return current_pending, TREEMAP_PROMPT, not bool(current_pending)
 
     if not click_data or not click_data.get("points"):
         return None, TREEMAP_PROMPT, True
@@ -443,8 +458,9 @@ def capture_treemap_selection(click_data, *args):
     if not label or label not in data.available_set:
         return None, TREEMAP_PROMPT, True
     if label in current_selections:
-        return label, f"{label} is already in the comparison list.", True
+        return label, TREEMAP_PROMPT, True
     msg = f"Chosen education: {label}. Click 'Add to comparison' to highlight it."
+    # Leave the add button enabled even at limit; the selection callback will show the popup.
     return label, msg, False
 
 @app.callback(
@@ -556,7 +572,7 @@ def show_treemap_drill(click_data, city_value, theme_name, add_clicks):
 
 
 @app.callback(
-    selection_outputs,
+    selection_outputs + [selection_error_output, *selection_limit_dialog_outputs],
     [
         Input("treemap_add", "n_clicks"),
         Input("clear_selections", "n_clicks"),
@@ -578,39 +594,44 @@ def modify_selections(add_clicks, clear_clicks, *args):
     if not ctx.triggered:
         raise PreventUpdate
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    error_text = ""
+    show_dialog = False
+    dialog_msg = ""
 
     if trigger == "clear_selections":
-        return [None] * MAX_SELECTIONS
+        return [None] * MAX_SELECTIONS + [error_text, show_dialog, dialog_msg]
 
     if trigger.startswith("remove_edu"):
         idx = int(trigger.replace("remove_edu", "")) - 1
         compact = [v for i, v in enumerate(current) if i != idx and v]
         compact += [None] * (MAX_SELECTIONS - len(compact))
-        return compact
+        return compact + [error_text, show_dialog, dialog_msg]
 
     if trigger == "treemap_add":
         if not add_clicks or not pending or pending not in data.available_set:
             raise PreventUpdate
         if pending in current:
-            return current
+            return current + [error_text, show_dialog, dialog_msg]
         for i, val in enumerate(current):
             if not val:
                 current[i] = pending
-                return current
-        current = current[1:] + [pending]
-        return current
+                return current + [error_text, show_dialog, dialog_msg]
+        dialog_msg = "Max limit for education comparison hit. Please remove one before adding more."
+        show_dialog = True
+        return current + [error_text, show_dialog, dialog_msg]
 
     if trigger == "bubble_confirm":
         if not bubble_submit or not bubble_pending or bubble_pending not in data.available_set:
             raise PreventUpdate
         if bubble_pending in current:
-            return current
+            return current + [error_text, show_dialog, dialog_msg]
         for i, val in enumerate(current):
             if not val:
                 current[i] = bubble_pending
-                return current
-        current = current[1:] + [bubble_pending]
-        return current
+                return current + [error_text, show_dialog, dialog_msg]
+        dialog_msg = "Max limit for education comparison hit. Please remove one before adding more."
+        show_dialog = True
+        return current + [error_text, show_dialog, dialog_msg]
 
     raise PreventUpdate
 
