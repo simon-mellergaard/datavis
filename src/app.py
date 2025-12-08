@@ -413,14 +413,32 @@ def update_treemap(city_value, metric_key, *args):
     Output("treemap_pending_label", "children"),
     Output("treemap_add", "disabled"),
     Input("treemap", "clickData"),
+    *selection_inputs,
+    State("treemap_pending", "data"),
 )
 
-def capture_treemap_selection(click_data):
+def capture_treemap_selection(click_data, *args):
+    current_pending = args[-1] if args else None
+    selection_values = list(args[:-1]) if args else []
+    current_selections = {v for v in selection_values if v}
+    ctx = callback_context
+
+    # If the change came from selection updates (e.g., removing an education), clear pending if it no longer exists.
+    if ctx.triggered and ctx.triggered[0]["prop_id"].split(".")[0] != "treemap":
+        if current_pending and current_pending not in current_selections:
+            return None, TREEMAP_PROMPT, True
+        if current_pending and current_pending in current_selections:
+            return current_pending, f"{current_pending} is already in the comparison list.", True
+        # No pending selection; keep disabled.
+        return current_pending, TREEMAP_PROMPT if not current_pending else f"Chosen education: {current_pending}. Click 'Add to comparison' to highlight it.", not bool(current_pending)
+
     if not click_data or not click_data.get("points"):
         return None, TREEMAP_PROMPT, True
     label = click_data["points"][0].get("label")
     if not label or label not in data.available_set:
         return None, TREEMAP_PROMPT, True
+    if label in current_selections:
+        return label, f"{label} is already in the comparison list.", True
     msg = f"Chosen education: {label}. Click 'Add to comparison' to highlight it."
     return label, msg, False
 
@@ -432,6 +450,11 @@ def capture_treemap_selection(click_data):
     selection_inputs,
 )
 def prompt_add_from_bubble(click_data, *values):
+    ctx = callback_context
+    # If the callback was triggered by selection changes (remove/clear), do nothing and clear pending.
+    if ctx.triggered and ctx.triggered[0]["prop_id"].split(".")[0] != "selection_bubble":
+        return None, False, ""
+
     current = [v for v in values if v]
     if not click_data or not click_data.get("points"):
         return None, False, ""
