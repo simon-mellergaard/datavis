@@ -3,6 +3,8 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Double check colour blind safety (take a few SS and put into colour blind checker)
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
+* EVT extra: Further work needed with the barcharts along with adding additional information
+* EVT extra: Along the lines of the previous one decide what is to be done when the user is on the national level and if the barcharts are even necessary there.
 
 ###################### DONE ######################################### 
 
