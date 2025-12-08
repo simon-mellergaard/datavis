@@ -693,8 +693,11 @@ def update_parallel_plot(*args):
     if not chosen:
         chosen = available[:5]
 
+    triggered = {t["prop_id"] for t in callback_context.triggered} if callback_context.triggered else set()
+    reset_sliders = "city_select.value" in triggered
+
     prev_slider_values = {}
-    if slider_ids and slider_values:
+    if not reset_sliders and slider_ids and slider_values:
         prev_slider_values = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
 
     slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles)
