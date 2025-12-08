@@ -901,6 +901,12 @@ def build_city_treemap(
     )
     marker_dict["cmin"] = marker_cmin
     marker_dict["cmax"] = marker_cmax
+    # Ensure treemap rectangles have a clear border color (theme-specific)
+    try:
+        marker_dict["line"] = dict(color=theme.treemap_border, width=0.6)
+    except Exception:
+        # Fallback to card border if the theme doesn't provide treemap_border
+        marker_dict["line"] = dict(color=theme.card_border, width=0.6)
 
     fig = go.Figure(
         go.Treemap(
@@ -1093,7 +1099,7 @@ def build_parallel_coordinates(
             "xs", 
             "ys", 
             source=source, 
-            line_color="#BBBBBB",  # Subtle Grey Color
+            line_color="#878787",  # Subtle Grey Color
             line_alpha=0.18,       # Low Opacity for density build-up
             line_width=1           # Thin line
         )

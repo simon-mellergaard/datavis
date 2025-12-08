@@ -11,6 +11,7 @@ class Theme:
     font: str
     card_bg: str
     card_border: str
+    treemap_border: str
     border_subtle: str
     muted_text: str
     template: str
@@ -27,6 +28,7 @@ THEMES: dict[str, Theme] = {
         font="#ffffff",
         card_bg="#11151b",
         card_border="#2a2f3a",
+        treemap_border="#000000",
         border_subtle="#2a2f3a",
         muted_text="#adb5c6",
         template="plotly_dark",
@@ -41,6 +43,7 @@ THEMES: dict[str, Theme] = {
         font="#0f172a",
         card_bg="#ffffff",
         card_border="#e2e8f0",
+        treemap_border="#333333",
         border_subtle="#cbd5e1",
         muted_text="#475569",
         template="plotly_white",
