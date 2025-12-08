@@ -1196,9 +1196,9 @@ def build_selection_bubble(
         if t in selected_set:
             colors.append(color_map.get(t, "#4dabf7"))
         elif match:
-            colors.append("#6c757d")  # slider matches but not selected = grey highlight
+            colors.append("#BBBBBB")  # slider matches but not selected = grey highlight #Both should be the same grey now
         else:
-            colors.append("#adb5bd")  # background (only shown if no sliders)
+            colors.append("#BBBBBB")  # background (only shown if no sliders)
 
     hover_text = []
     for _, row in agg.iterrows():
@@ -1238,7 +1238,7 @@ def build_selection_bubble(
                 hoverinfo="text",
                 marker=dict(
                     size=np.array(marker_sizes)[bg_mask],
-                    color="#adb5bd",
+                    color="#BBBBBB",
                     opacity=0.6,
                     line=dict(color=theme.card_border, width=0.5),
                 ),
