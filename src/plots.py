@@ -422,8 +422,8 @@ def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
         return html.Div("Ingen koordinater fundet for denne uddannelse.", style={"color": theme.font})
 
     # Fixed Denmark view; markers move, viewport stays consistent.
-    center_lat, center_lon = 56.0, 10.5
-    zoom = 7.0
+    center_lat, center_lon = 55.0, 11.0
+    zoom = 6.0
     bounds = None
 
     markers = []
