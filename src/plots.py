@@ -1174,8 +1174,14 @@ def build_parcoord_sliders(
             continue
 
         # ----- Determine clean min/max from data -----
-        min_val = clean_float(series.min())
-        max_val = clean_float(series.max())
+        data_min = float(series.min())
+        data_max = float(series.max())
+        if col in likert_columns:
+            min_val = clean_float(data_min)
+            max_val = clean_float(data_max)
+        else:
+            min_val = clean_float(data_min)
+            max_val = clean_float(data_max)
 
         if np.isclose(min_val, max_val):
             max_val = min_val + 0.1
@@ -1194,30 +1200,10 @@ def build_parcoord_sliders(
         max_val = clean_float(max_val)
         step = 0.1
 
-        # ----- Build marks with guaranteed clean keys -----
+        # ----- Build marks with guaranteed clean keys (only min and max) -----
         marks: Dict[float, str] = {}
-        marks[min_val] = f"{min_val:.1f}"
-        marks[max_val] = f"{max_val:.1f}"
-
-        if col in likert_columns:
-            # Likert: show clean integers (1.0, 2.0, ..., 5.0)
-            start = max(1, int(np.floor(min_val)))
-            end = min(5, int(np.ceil(max_val)))
-            for i in range(start, end + 1):
-                key = clean_float(i)          # exactly 3.0, 4.0, 5.0 etc.
-                marks[key] = str(i)           # display as "3", "4", "5" – looks cleaner
-
-            # Optional: always show full 1–5 even if data is narrower
-            # for i in range(1, 6):
-            #     marks[clean_float(i)] = str(i)
-        else:
-            # Continuous variables – intermediate ticks
-            if max_val - min_val > 0.2:
-                ticks = np.linspace(min_val, max_val, num=5)
-                for t in ticks[1:-1]:
-                    t_clean = clean_float(t)
-                    if not np.isclose(t_clean, min_val) and not np.isclose(t_clean, max_val):
-                        marks[t_clean] = f"{t_clean:.1f}"
+        marks[min_val + 1e-6] = f"{min_val:.1f}"
+        marks[max_val - 1e-6] = f"{max_val:.1f}"
 
         # ----- Current value (with bounds clamping) -----
         default = [min_val, max_val]
