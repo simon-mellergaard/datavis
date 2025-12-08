@@ -190,6 +190,10 @@ def load_data(
     df_prov["maanedloen_nyudd_n"] = to_num(df_prov.get("maanedloen_nyudd"))
     df_prov["ledighed_nyudd_n"] = to_num(df_prov.get("ledighed_nyudd"))
 
+    # View without kandidat programmes (for visuals and dropdowns; dataset remains intact).
+    mask_non_kandidat = ~df_prov["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)
+    df_prov_no_kandidat = df_prov[mask_non_kandidat].copy()
+
     excluded_cities = {
         "ballerup",
         "bornholm",
@@ -218,7 +222,7 @@ def load_data(
     size_options = [{"label": v[2], "value": k} for k, v in SIZE_METRICS.items()]
 
     available_titles = sorted(
-        df_prov.dropna(subset=["educational_category", "cluster_label", "titel"])["titel"]
+        df_prov_no_kandidat.dropna(subset=["educational_category", "cluster_label", "titel"])["titel"]
         .dropna()
         .astype(str)
         .unique()

@@ -170,6 +170,14 @@ def bar_colors(n: int) -> Sequence[str]:
     return px.colors.sample_colorscale(px.colors.sequential.Blues_r, steps)
 
 
+def _exclude_kandidat(df: pd.DataFrame) -> pd.DataFrame:
+    """Filter out kandidat programmes from provider-level views without touching the dataset."""
+    if "displaydocclass" not in df.columns:
+        return df
+    mask = ~df["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)
+    return df[mask]
+
+
 def build_color_map_for_selected(
     selected_titles: Iterable[str],
     previous_map: Dict[str, str] | None = None,
@@ -249,11 +257,24 @@ def build_detail_table(data: DataBundle, edu_title: str):
         return None
 
     def first_link(frame: pd.DataFrame, column: str):
+        """Return the first non-empty link, preferring non-kandidat entries when available."""
         if column not in frame.columns:
             return None
-        series = frame[column].dropna().astype(str).str.strip()
-        series = series[series != ""]
-        return series.iloc[0] if not series.empty else None
+
+        def pick_link(subframe: pd.DataFrame):
+            series = subframe[column].dropna().astype(str).str.strip()
+            series = series[series != ""]
+            return series.iloc[0] if not series.empty else None
+
+        if "displaydocclass" in frame.columns:
+            non_kandidat = frame[
+                ~frame["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)
+            ]
+            link = pick_link(non_kandidat)
+            if link:
+                return link
+
+        return pick_link(frame)
 
     rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
     for column, label, how, formatter in DETAIL_OVERVIEW_SPECS:
@@ -333,7 +354,7 @@ def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) 
         )
         return fig
 
-    providers_geo = ensure_latlon_from_municipality(providers_df)
+    providers_geo = ensure_latlon_from_municipality(_exclude_kandidat(providers_df))
     if "kvote_1_kvotient" in providers_geo.columns:
         providers_geo["kvote_num"] = to_num(providers_geo["kvote_1_kvotient"])
     if "standby_8" in providers_geo.columns:
@@ -546,7 +567,7 @@ def build_treemap_drill_chart(
     theme: Theme | None = None,
 ) -> go.Figure:
     theme = theme or DEFAULT_THEME
-    df = data.df_prov[data.df_prov["titel"] == edu_title].copy()
+    df = _exclude_kandidat(data.df_prov[data.df_prov["titel"] == edu_title].copy())
     if city_value and city_value != "__ALL__":
         df = df[df["instkommunetx"] == city_value]
         # If we asked for a specific city but have no rows, return an empty chart instead of national fallback.
@@ -570,6 +591,8 @@ def build_treemap_drill_chart(
                 font=dict(color=theme.font, size=12),
             )
             return empty
+    if df.empty:
+        df = _exclude_kandidat(data.df_prov[data.df_prov["titel"] == edu_title].copy())
     if df.empty:
         df = data.df[data.df["titel"] == edu_title].copy()
     if df.empty or metric_key not in df.columns:
@@ -626,7 +649,7 @@ def build_treemap_drill_chart(
         )
         title_text = f"{label} - {city_value}"
         # National comparison bar
-        nat_source = data.df_prov if metric_key in data.df_prov.columns else data.df
+        nat_source = _exclude_kandidat(data.df_prov) if metric_key in data.df_prov.columns else data.df
         nat_vals = pd.to_numeric(nat_source[metric_key], errors="coerce")
         nat_mean = float(nat_vals.mean()) if not nat_vals.dropna().empty else np.nan
         if not np.isnan(nat_mean):
@@ -779,10 +802,11 @@ def build_city_treemap(
         else:
             allowed_titles = set()
 
+    base_df = _exclude_kandidat(data.df_prov)
     if city_value and city_value != "__ALL__":
-        df_sel = data.df_prov[data.df_prov["instkommunetx"] == city_value].copy()
+        df_sel = base_df[base_df["instkommunetx"] == city_value].copy()
     else:
-        df_sel = data.df_prov.copy()
+        df_sel = base_df.copy()
     if allowed_titles is not None:
         df_sel = df_sel[df_sel["titel"].isin(allowed_titles)]
 
@@ -1210,7 +1234,7 @@ def build_selection_bubble(
     fig.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
     slider_filter = slider_filter or {}
 
-    df = data.df_prov.copy()
+    df = _exclude_kandidat(data.df_prov.copy())
     df = df[df["titel"].notna()]
     if city_value and city_value != "__ALL__":
         df = df[df["instkommunetx"] == city_value]
