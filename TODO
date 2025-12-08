@@ -6,7 +6,6 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * The name for filter for municipality should probably also be changed since it is done on cities not municipalities
 * CHR values in the information box for "Detaljer for specifik uddannelse" needs to be changed since it just shows as one big string now
 * Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
-* Tilføj UG links
 * Fjerne variabler som ikke er likert fra paralel coordinates
 * Double check colour blind safety (take a few SS and put into colour blind checker)
 
@@ -18,3 +17,4 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Adjust the barcharts that appear in the treemap, and consider if they should be entirely scrapped.
 * Adjust sub categories (either new LLM or manually right now medicin is fx under byggeri/transport)
 * Add all possible education location latitude and longitude to the script (right now it is only the major cities but it should be aligned with the filter for municipality)
+* Tilføj UG links
