@@ -511,6 +511,10 @@ def show_treemap_drill(click_data, city_value, theme_name, add_clicks):
     if callback_context.triggered and callback_context.triggered[0]["prop_id"].startswith("treemap_add"):
         return None, base_style
 
+    # Hide overlay when city filter changes.
+    if callback_context.triggered and callback_context.triggered[0]["prop_id"].split(".")[0] == "city_select":
+        return None, base_style
+
     if not click_data or not click_data.get("points"):
         return None, base_style
 
