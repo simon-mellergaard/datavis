@@ -1,8 +1,6 @@
 THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
-* Fix the text inside the treemap cells to not show % of parent
 * Bubble tilføj legend
-* The name for filter for municipality should probably also be changed since it is done on cities not municipalities
 * CHR values in the information box for "Detaljer for specifik uddannelse" needs to be changed since it just shows as one big string now
 * Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
 * Fjerne variabler som ikke er likert fra paralel coordinates
@@ -19,3 +17,5 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Add all possible education location latitude and longitude to the script (right now it is only the major cities but it should be aligned with the filter for municipality)
 * Tilføj UG links
 * Bubblechart fixing (mapper på radius + variabler vist ved hoved skal tilpasses + størrelse når valgt skal ændre sig)
+* Fix the text inside the treemap cells to not show % of parent
+* The name for filter for municipality should probably also be changed since it is done on cities not municipalities
