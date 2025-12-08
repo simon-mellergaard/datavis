@@ -1133,52 +1133,82 @@ def build_parcoord_sliders(
     components: List[html.Div] = []
     slider_filter: Dict[str, Sequence[float]] = {}
     df = data.df
+    
     if allowed_titles is not None:
         df = df[df["titel"].isin(allowed_titles)]
 
     for col in selected_vars:
         if col not in df.columns:
             continue
+
+        series = df[col].dropna().astype(float)
+        if series.empty:
+            continue
         
-        # --- START OF CHANGE ---
-        # Set min/max/step/default to 1.0 to 5.0 for all sliders
-        min_val, max_val = 1.0, 5.0 
-        step = 0.1
-        marks = {i: str(i) for i in range(1, 6)}
+        # --- DYNAMIC MIN/MAX CALCULATION ---
+        
+        actual_min = float(series.min())
+        actual_max = float(series.max())
+
+        # Handle case where min == max
+        if np.isclose(actual_min, actual_max):
+            actual_max = actual_min + 1.0
+            
+        # 1. Set the range (min/max) based on the data
+        min_val = actual_min
+        max_val = actual_max
+        
+        # 2. Set the step size (Precision)
+        step = 0.1 
+        
+        # 3. Determine marks for display (Including min_val and max_val)
+        
+        # Initialize marks with the endpoints
+        marks = {
+            min_val: f"{min_val:.1f}", # Use .1f for better readability by default
+            max_val: f"{max_val:.1f}"
+        }
+
+        if col in PARCOORD_LIKERT_COLUMNS:
+            # Likert: Add integer marks (1, 2, 3, 4, 5) if they fall within the range
+            # We enforce min/max to be at least 1 and 5 for marking consistency, 
+            # even if data is narrower (the slider min/max still follows the data's true bounds).
+            marking_min = 1
+            marking_max = 5
+            
+            # Use integers for marking positions
+            for i in range(marking_min, marking_max + 1):
+                # Only add marks that fall reasonably within the actual data range
+                if i > min_val + 0.001 and i < max_val - 0.001: 
+                     marks[float(i)] = str(i)
+            
+        else:
+            # Continuous: Add three intermediate ticks
+            # Use 5 points in linspace to get 3 unique intermediate points
+            ticks = np.linspace(actual_min, actual_max, num=5)
+            
+            # Add intermediate points
+            for t in ticks[1:-1]:
+                # We use .2f for intermediate marks if .1f hides too much info
+                marks[float(f"{t:.2f}")] = f"{t:.2f}"
+            
+        # --- END OF DYNAMIC MIN/MAX CALCULATION ---
+            
         default = [min_val, max_val]
-        # --- END OF CHANGE ---
-
-        # If it's not a Likert column, we still determine the actual range for display/labels,
-        # but the slider range remains 1.0 to 5.0 for filtering.
-        if col not in PARCOORD_LIKERT_COLUMNS:
-            series = df[col].dropna().astype(float)
-            if series.empty:
-                continue
-            
-            # The tick marks still reflect the data's real range (for visual context)
-            actual_min = float(series.min())
-            actual_max = float(series.max())
-            if np.isclose(actual_min, actual_max):
-                actual_max = actual_min + 1.0
-            
-            ticks = np.linspace(actual_min, actual_max, num=4)
-            marks = {float(f"{t:.0f}"): f"{t:.0f}" for t in ticks}
-            # Keep min_val/max_val at 1.0/5.0 for the slider definition below
-
-        # Use current values if they exist, otherwise use the new 1.0-5.0 default
         current = list(previous_values.get(col, default))
         
         slider = dcc.RangeSlider(
             id={"type": "parcoord-slider", "column": col},
-            min=min_val, # This is now always 1.0
-            max=max_val, # This is now always 5.0
+            min=min_val,
+            max=max_val,
             step=step,
             value=current,
-            marks=marks,
+            marks=marks,  # <-- Now contains the precise min_val and max_val keys
             tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
-            className="dark-slider-track" #Change slider colour
+            className="dark-slider-track"
         )
+        
         # Use a label with a `title` so hovering shows a tooltip with a short explanation.
         label_text = PARCOORD_LABELS.get(col, col)
         label_tooltip = PARCOORD_TOOLTIPS.get(col, "")
@@ -1188,8 +1218,9 @@ def build_parcoord_sliders(
                 style={"marginBottom": "16px"},
             )
         )
-        if current != default:
-            # Only include the filter if the user has changed it away from 1.0-5.0
+        
+        if not np.isclose(current[0], default[0]) or not np.isclose(current[1], default[1]):
+            # Only include the filter if the user has changed it away from the min-max default
             slider_filter[col] = current
 
     return components, slider_filter
