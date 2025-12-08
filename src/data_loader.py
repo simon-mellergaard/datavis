@@ -45,6 +45,7 @@ SIZE_METRICS = {
     "optagne": ("optagne_num", "sum", "Optagne (sum)"),
     "maanedloen_nyudd": ("maanedloen_nyudd_n", "mean", "Løn (nyudd.) (gennemsnit)"),
     "ledighed_nyudd": ("ledighed_nyudd_n", "mean", "Ledighed (nyudd.) (gennemsnit)"),
+    "tidsforbrug": ("tidsforbrug_p50_num", "mean", "Tidsforbrug på studiet"),
 }
 
 
@@ -189,6 +190,8 @@ def load_data(
     df_prov["optagne_num"] = to_num(df_prov.get("optagne"))
     df_prov["maanedloen_nyudd_n"] = to_num(df_prov.get("maanedloen_nyudd"))
     df_prov["ledighed_nyudd_n"] = to_num(df_prov.get("ledighed_nyudd"))
+    df_prov["afbrud_num"] = to_num(df_prov.get("afbrud"))
+    df_prov["tidsforbrug_p50_num"] = to_num(df_prov.get("tidsforbrug_p50"))
 
     # View without kandidat programmes (for visuals and dropdowns; dataset remains intact).
     mask_non_kandidat = ~df_prov["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)

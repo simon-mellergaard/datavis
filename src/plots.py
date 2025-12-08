@@ -132,6 +132,11 @@ PARCOORD_LABELS: Dict[str, str] = {
     "ledighed_nyudd": "Ledighed nyudd.",
     "maanedloen_nyudd": "Løn (nyudd.)",
     "maanedloen_10aar": "Løn (10 år)",
+    "optagne_num": "Optagne (sum)",
+    "ledighed_nyudd_n": "Ledighed nyudd.",
+    "maanedloen_nyudd_n": "Løn (nyudd.)",
+    "afbrud_num": "Afbrud (%)",
+    "tidsforbrug_p50_num": "Tidsforbrug på studiet (timer)",
 }
 
 # Short explanatory tooltips for parallel-coordinate variables (shown on hover)
@@ -158,10 +163,12 @@ PARCOORD_TOOLTIPS: Dict[str, str] = {
 }
 
 TREEMAP_DRILL_METRICS = [
-    ("maanedloen_nyudd", PARCOORD_LABELS["maanedloen_nyudd"]),
-    ("ledighed_nyudd", PARCOORD_LABELS["ledighed_nyudd"]),
-    ("stress_daglig_likert", PARCOORD_LABELS["stress_daglig_likert"]),
-    ("tilpas_likert", PARCOORD_LABELS["tilpas_likert"]),
+    ("afbrud_num", "Afbrud (%)"),
+    ("maanedloen_nyudd_n", "Løn"),
+    ("ledighed_nyudd_n", "Ledighed"),
+    ("tilpas_likert", "Trives (likert)"),
+    ("optagne_num", "Optagne"),
+    ("tidsforbrug_p50_num", "Tidsforbrug på studiet"),
 ]
 
 
