@@ -260,15 +260,14 @@ def build_detail_table(data: DataBundle, edu_title: str):
         value = metric_value(column, how)
         display = formatter(value) if value is not None else "N/A"
         rows.append(html.Tr([html.Th(label), html.Td(display)]))
-    if any(strings.values()):
-        rows.append(
-            html.Tr(
-                [
-                    html.Th("Første job (typisk)"),
-                    html.Td(", ".join([s for s in strings.values() if s])),
-                ]
-            )
-        )
+    # Show each listed "Første job" on its own row instead of joining them
+    jobs = [s for s in strings.values() if s]
+    if jobs:
+        # Header row with the first job
+        rows.append(html.Tr([html.Th("Første job (typisk)"), html.Td(jobs[0])]))
+        # Additional jobs on their own rows with an empty first cell for alignment
+        for job in jobs[1:]:
+            rows.append(html.Tr([html.Th(""), html.Td(job)]))
 
     ug_link = first_link(providers, "url") or (first_link(overview, "url") if not overview.empty else None)
     if ug_link:
@@ -920,6 +919,8 @@ def build_city_treemap(
     return fig
 
 
+FILTERED_GREY = "#BBBBBB" # Neutral Mid-Grey
+
 def build_parallel_coordinates(
     data: DataBundle,
     selected_titles: Iterable[str],
@@ -956,26 +957,30 @@ def build_parallel_coordinates(
             axis_ranges[col] = (vmin, vmax)
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
+        """Normalizes a value to the [0.0, 1.0] range based on axis bounds."""
         lo, hi = bounds
         span = max(hi - lo, 1e-9)
         return float(np.clip((value - lo) / span, 0.0, 1.0))
 
     def row_values(row):
+        """Returns a dict of normalized values for the row."""
         return {col: normalize(float(row[col]), axis_ranges[col]) for col in columns}
 
     def matches_slider(row):
+        """Checks if a row's values fall within the active slider filters."""
         if not slider_filter:
-            return False
+            # If the slider_filter is empty, we consider it a match to show everything.
+            return True
         for col, (lo, hi) in slider_filter.items():
             val = row.get(col)
+            # Check for NaN or if value is outside the [lo, hi] range
             if pd.isna(val) or val < lo or val > hi:
                 return False
         return True
 
     xs_template = list(range(len(columns)))
-    base_xs: List[List[int]] = []
-    base_ys: List[List[float]] = []
-    base_titles: List[str] = []
+    
+    # base_xs, base_ys, base_titles lists are REMOVED as they are no longer populated.
     filtered_xs: List[List[int]] = []
     filtered_ys: List[List[float]] = []
     filtered_titles: List[str] = []
@@ -985,25 +990,29 @@ def build_parallel_coordinates(
     selected_titles_list: List[str] = []
     selected_values_list: List[List[float]] = []
 
+    # --- CORE ITERATION LOGIC: ONLY POPULATE SELECTED OR FILTERED ---
     for _, row in df.iterrows():
         title = str(row["titel"])
         norm_map = row_values(row)
         values = [norm_map[col] for col in columns]
-        if title in selected_list:
+        
+        is_selected = title in selected_list
+        is_filtered = matches_slider(row)
+        
+        if is_selected:
+            # Selected: Always shown, using categorical color
             selected_xs.append(xs_template[:])
             selected_ys.append(values)
             selected_colors.append(color_map.get(title, "#ff6b6b"))
             selected_titles_list.append(title)
             selected_values_list.append([float(row[col]) for col in columns])
-        elif matches_slider(row):
+        elif is_filtered:
+            # Filtered (but NOT Selected): Shown using the subtle grey color
             filtered_xs.append(xs_template[:])
             filtered_ys.append(values)
             filtered_titles.append(title)
-        else:
-            base_xs.append(xs_template[:])
-            base_ys.append(values)
-            base_titles.append(title)
-
+        # ELSE: (Not selected AND does not match slider filter) -> IGNORED.
+        
     # Disable interactive pan/drag by not providing any active tools.
     # HoverTool is added later via `add_tools` so it will still work.
     p = figure(
@@ -1034,12 +1043,14 @@ def build_parallel_coordinates(
     p.xaxis.axis_line_color = theme.card_border
 
     for idx, col in enumerate(columns):
+        # Vertical axis line segments
         p.segment(x0=idx, y0=0, x1=idx, y1=1, line_color=theme.card_border, line_alpha=0.4)
         lo, hi = axis_ranges[col]
+        # Axis labels (max/min)
         p.text(x=idx, y=1.03, text=[f"{hi:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
         p.text(x=idx, y=-0.06, text=[f"{lo:.1f}"], text_align="center", text_color=theme.font, text_font_size="10px")
-        # For likert-style axes, draw horizontal gridlines at ticks (2..5).
-        # Only label the tick numbers on the left-most axis.
+        
+        # Likert-style axis gridlines and labels
         if col in PARCOORD_LIKERT_COLUMNS:
             for tick in (2, 3, 4, 5):
                 try:
@@ -1060,13 +1071,24 @@ def build_parallel_coordinates(
                     )
 
     hover_renderers = []
-    if base_xs:
-        source = ColumnDataSource(dict(xs=base_xs, ys=base_ys, title=base_titles))
-        p.multi_line("xs", "ys", source=source, line_color="#6c757d", line_alpha=0.18, line_width=1)
+    
+    # --- PLOTTING LOGIC: ONLY FILTERED AND SELECTED LINES ---
+    # Removed the drawing of base_xs entirely.
+    
     if filtered_xs:
+        # Filtered lines (non-selected) use the subtle style of the old 'base_xs' for density mapping
         source = ColumnDataSource(dict(xs=filtered_xs, ys=filtered_ys, title=filtered_titles))
-        p.multi_line("xs", "ys", source=source, line_color="#4dabf7", line_alpha=0.7, line_width=1.5)
+        p.multi_line(
+            "xs", 
+            "ys", 
+            source=source, 
+            line_color="#BBBBBB",  # Subtle Grey Color
+            line_alpha=0.18,       # Low Opacity for density build-up
+            line_width=1           # Thin line
+        )
+    
     if selected_xs:
+        # Selected lines use the categorical color and are drawn on top
         tooltip_texts = []
         for value_list in selected_values_list:
             lines = [f"{PARCOORD_LABELS.get(col, col)}: {val:.2f}" for col, val in zip(columns, value_list)]
@@ -1106,34 +1128,45 @@ def build_parcoord_sliders(
     for col in selected_vars:
         if col not in df.columns:
             continue
-        if col in PARCOORD_LIKERT_COLUMNS:
-            min_val, max_val = 1.0, 5.0
-            step = 0.1
-            marks = {i: str(i) for i in range(1, 6)}
-            default = [5.0, 5.0]
-        else:
+        
+        # --- START OF CHANGE ---
+        # Set min/max/step/default to 1.0 to 5.0 for all sliders
+        min_val, max_val = 1.0, 5.0 
+        step = 0.1
+        marks = {i: str(i) for i in range(1, 6)}
+        default = [min_val, max_val]
+        # --- END OF CHANGE ---
+
+        # If it's not a Likert column, we still determine the actual range for display/labels,
+        # but the slider range remains 1.0 to 5.0 for filtering.
+        if col not in PARCOORD_LIKERT_COLUMNS:
             series = df[col].dropna().astype(float)
             if series.empty:
                 continue
-            min_val = float(series.min())
-            max_val = float(series.max())
-            if np.isclose(min_val, max_val):
-                max_val = min_val + 1.0
-            step = max((max_val - min_val) / 100.0, 1e-2)
-            ticks = np.linspace(min_val, max_val, num=4)
+            
+            # The tick marks still reflect the data's real range (for visual context)
+            actual_min = float(series.min())
+            actual_max = float(series.max())
+            if np.isclose(actual_min, actual_max):
+                actual_max = actual_min + 1.0
+            
+            ticks = np.linspace(actual_min, actual_max, num=4)
             marks = {float(f"{t:.0f}"): f"{t:.0f}" for t in ticks}
-            default = [max_val, max_val]
+            # Keep min_val/max_val at 1.0/5.0 for the slider definition below
 
+        # Use current values if they exist, otherwise use the new 1.0-5.0 default
         current = list(previous_values.get(col, default))
+        
         slider = dcc.RangeSlider(
             id={"type": "parcoord-slider", "column": col},
-            min=min_val,
-            max=max_val,
+            min=min_val, # This is now always 1.0
+            max=max_val, # This is now always 5.0
             step=step,
             value=current,
             marks=marks,
             tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
+            className="dark-slider-track" #Change slider colour
         )
         # Use a label with a `title` so hovering shows a tooltip with a short explanation.
         label_text = PARCOORD_LABELS.get(col, col)
@@ -1145,6 +1178,7 @@ def build_parcoord_sliders(
             )
         )
         if current != default:
+            # Only include the filter if the user has changed it away from 1.0-5.0
             slider_filter[col] = current
 
     return components, slider_filter
@@ -1266,9 +1300,9 @@ def build_selection_bubble(
         if t in selected_set:
             colors.append(color_map.get(t, "#4dabf7"))
         elif match:
-            colors.append("#6c757d")  # slider matches but not selected = grey highlight
+            colors.append("#BBBBBB")  # slider matches but not selected = grey highlight #Both should be the same grey now
         else:
-            colors.append("#adb5bd")  # background (only shown if no sliders)
+            colors.append("#BBBBBB")  # background (only shown if no sliders)
 
     hover_text = []
     for _, row in agg.iterrows():
@@ -1308,7 +1342,7 @@ def build_selection_bubble(
                 hoverinfo="text",
                 marker=dict(
                     size=np.array(marker_sizes)[bg_mask],
-                    color="#adb5bd",
+                    color="#BBBBBB",
                     opacity=0.6,
                     line=dict(color=theme.card_border, width=0.5),
                 ),
