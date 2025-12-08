@@ -1,7 +1,8 @@
 THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
-* Add option to scale parallel coordinates to min and max.
-* Map chart???
+* Check visualization for bugs and other things (but hopefully nothing too major, yikes)
+* Read the report, contributions and script for video and add comments with changes/additions
+
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
 * EVT extra: Further work needed with the barcharts along with adding additional information
@@ -29,4 +30,5 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Add borders in treemap in light mode. (Simon)
 * Modify background color in parallel coordinates (Simon).
 * Dropdown menu - filter ift hvilke uddannelser der er valgt
-* 
+* Add option to scale parallel coordinates to min and max.
+* Map chart???
