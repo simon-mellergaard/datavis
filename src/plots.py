@@ -80,7 +80,13 @@ PARCOORD_VARIABLES = [
     # "maanedloen_nyudd",
     # "maanedloen_10aar",
 ]
-PARCOORD_DEFAULT_VARS = PARCOORD_VARIABLES[:5]
+PARCOORD_DEFAULT_VARS = [
+    "fagligmiljo_likert",
+    "socialtmiljo_likert",
+    "tilpas_likert",
+    "stress_daglig_likert",
+    "undervisere_engagerede_likert",
+]
 PARCOORD_LIKERT_COLUMNS = {
     "fagligmiljo_likert",
     "arbmedstud_likert",
@@ -96,18 +102,15 @@ PARCOORD_LIKERT_COLUMNS = {
     "undervisere_kontakt_likert",
 }
 
-COLOR_PALETTE = [
-    "#d62728",
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf",
+COLOR_PALETTE = [ #categorical colours - paul tols bright colours
+    "#4477AA",  # Blue
+    "#66CCEE",  # Cyan
+    "#228833",  # Green
+    "#CCBB44",  # Yellow
+    "#EE6677",  # Red
+    "#AA3377",  # Purple
 ]
+
 PARCOORD_LABELS: Dict[str, str] = {
     "fagligmiljo_likert": "Fagligt miljø",
     "arbmedstud_likert": "Arbejde med studier",
