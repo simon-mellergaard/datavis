@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
+import dash_leaflet as dl
 from bokeh.embed import file_html
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.plotting import figure
@@ -298,8 +299,15 @@ def build_detail_table(data: DataBundle, edu_title: str):
         "udbud_id",
         "artikel_id",
         "titel",
+        "optagne",
         "kvote_1_kvotient",
         "standby_8",
+        "afbrud",
+        "tidsforbrug_p50",
+        "ledighed_nyudd",
+        "ledighed_10aar",
+        "maanedloen_nyudd",
+        "maanedloen_10aar",
         "inst_lat",
         "inst_lon",
     ]
@@ -393,6 +401,102 @@ def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) 
         margin=dict(t=0, l=0, r=0, b=0),
     )
     return fig
+
+
+def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
+    """Simplified map for provider locations using dash-leaflet."""
+    theme = theme or DEFAULT_THEME
+    if providers_df.empty:
+        return html.Div("Ingen koordinater fundet for denne uddannelse.", style={"color": theme.font})
+
+    providers_geo = ensure_latlon_from_municipality(providers_df)
+    providers_geo = providers_geo.dropna(subset=["inst_lat", "inst_lon"])
+    providers_geo = providers_geo[np.isfinite(providers_geo["inst_lat"]) & np.isfinite(providers_geo["inst_lon"])]
+    if providers_geo.empty:
+        return html.Div("Ingen koordinater fundet for denne uddannelse.", style={"color": theme.font})
+
+    latitudes = providers_geo["inst_lat"].astype(float)
+    longitudes = providers_geo["inst_lon"].astype(float)
+    center_lat = float(latitudes.mean()) if len(latitudes) else 56.0
+    center_lon = float(longitudes.mean()) if len(longitudes) else 10.5
+    bounds = None
+    zoom = 6
+    if len(providers_geo) == 1:
+        zoom = 11
+    elif len(providers_geo) > 1:
+        lat_min, lat_max = float(latitudes.min()), float(latitudes.max())
+        lon_min, lon_max = float(longitudes.min()), float(longitudes.max())
+        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
+
+    coord_key = "-".join([f"{la:.4f}_{lo:.4f}" for la, lo in zip(latitudes, longitudes)])
+
+    markers = []
+    for _, row in providers_geo.iterrows():
+        label_parts = [str(row.get("hovedinsttx", "")).strip()]
+        muni = str(row.get("instkommunetx", "")).strip()
+        if muni:
+            label_parts.append(muni)
+        title = str(row.get("titel", "")).strip()
+        if title:
+            label_parts.append(title)
+        tooltip_text = " • ".join([p for p in label_parts if p])
+
+        def fmt_percent(val):
+            num = to_num(pd.Series([val])).iloc[0]
+            return f"{num:.1f}%" if not pd.isna(num) else "N/A"
+
+        def fmt_float(val, digits=1):
+            num = to_num(pd.Series([val])).iloc[0]
+            return f"{num:.{digits}f}" if not pd.isna(num) else "N/A"
+
+        def fmt_kr(val):
+            num = to_num(pd.Series([val])).iloc[0]
+            return f"{num:,.0f} kr" if not pd.isna(num) else "N/A"
+
+        popup_rows = [
+            ("Optagne", fmt_float(row.get("optagne"), 0)),
+            ("Kvote 1 kvotient", fmt_float(row.get("kvote_1_kvotient"), 2)),
+            ("Standby", fmt_float(row.get("standby_8"), 0)),
+            ("Afbrud (%)", fmt_percent(row.get("afbrud"))),
+            ("Tidsforbrug (timer)", fmt_float(row.get("tidsforbrug_p50"), 1)),
+            ("Ledighed (nyudd.)", fmt_percent(row.get("ledighed_nyudd"))),
+            ("Ledighed (10 år)", fmt_percent(row.get("ledighed_10aar"))),
+            ("Løn (nyudd.)", fmt_kr(row.get("maanedloen_nyudd"))),
+            ("Løn (10 år)", fmt_kr(row.get("maanedloen_10aar"))),
+        ]
+
+        popup_table = html.Table(
+            [html.Tbody([html.Tr([html.Th(lbl), html.Td(val)]) for lbl, val in popup_rows])],
+            style={"fontSize": "12px", "lineHeight": "1.3"},
+        )
+
+        markers.append(
+            dl.Marker(
+                position=(float(row["inst_lat"]), float(row["inst_lon"])),
+                children=[
+                    dl.Tooltip(tooltip_text),
+                    dl.Popup(html.Div(popup_table)),
+                ],
+            )
+        )
+
+    marker_layer = dl.LayerGroup(markers) if markers else None
+
+    return dl.Map(
+        id=f"detail_leaflet_{coord_key}",
+        center=(center_lat, center_lon),
+        zoom=zoom if bounds is None else None,  # let bounds drive zoom when present
+        bounds=bounds,
+        boundsOptions={"padding": [20, 20]},
+        children=[
+            dl.TileLayer(
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                attribution="© OpenStreetMap contributors, © CARTO",
+            ),
+            *( [marker_layer] if marker_layer else [] ),
+        ],
+        style={"height": "520px", "width": "100%", "borderRadius": "6px"},
+    )
 
 
 TREEMAP_LEVELS = ["titel", "cluster_label", "educational_category"]
