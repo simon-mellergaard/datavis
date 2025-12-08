@@ -530,35 +530,25 @@ def show_treemap_drill(click_data, city_value, theme_name, add_clicks):
     theme = get_theme(theme_name)
 
     figs = []
-    for metric_key, metric_label in TREEMAP_DRILL_METRICS[:4]:
+    for metric_key, metric_label in TREEMAP_DRILL_METRICS:
         fig = build_treemap_drill_chart(data, label, metric_key, city_value, theme)
         figs.append(
             html.Div(
-                dcc.Graph(figure=fig, style={"height": "260px", "width": "220px"}),
-                style={"flex": "1 1 220px", "minWidth": "220px"},
+                dcc.Graph(figure=fig, style={"height": "240px", "width": "100%"}),
+                style={"flex": "1 1 30%", "minWidth": "280px", "maxWidth": "360px"},
             )
         )
-
-    bbox = click_data["points"][0].get("bbox") or {}
-    width = max(900, int(bbox.get("w", 900)))
-    height = max(320, int(bbox.get("h", 320)))
-
-    # Center the overlay at the midpoint of the clicked treemap cell.
-    x0 = float(bbox.get("x0", width / 2))
-    y0 = float(bbox.get("y0", height / 2))
-    w = float(bbox.get("w", width))
-    h = float(bbox.get("h", height))
-    left = x0 + w / 2
-    top = y0 + h / 2
 
     style = dict(base_style)
     style.update(
         {
             "display": "block",
-            "width": f"{width}px",
-            "minHeight": f"{height}px",
-            "top": f"{top}px",
-            "left": f"{left}px",
+            "width": "75vw",
+            "maxWidth": "1200px",
+            "minWidth": "680px",
+            "maxHeight": "80vh",
+            "top": "50%",
+            "left": "50%",
             "transform": "translate(-50%, -50%)",
         }
     )
@@ -568,9 +558,10 @@ def show_treemap_drill(click_data, city_value, theme_name, add_clicks):
         style={
             "display": "flex",
             "flexWrap": "wrap",
-            "gap": "10px",
+            "gap": "12px",
             "alignItems": "flex-start",
             "justifyContent": "flex-start",
+            "padding": "10px",
         },
     )
 

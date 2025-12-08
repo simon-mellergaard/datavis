@@ -1,7 +1,6 @@
 THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
 * Change sliders in parallel coordinates, so that each the min and max is corresponding to the min and max of the variable (William)
-* Remove masters educations. (Jonas)
 * Add option to scale parallel coordinates to min and max.
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
@@ -10,6 +9,7 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
 ###################### DONE ######################################### 
 
+* Remove masters educations. (Jonas)
 * Add tooltip for the variables in parallel coordinates
 * Add gridlines/numbers to the parallel coordinates
 * Fix plotting issue where the bar charts for specific educations on the tree map stays in place even after it has reverted back to the overview
