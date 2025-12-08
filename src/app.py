@@ -347,9 +347,9 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
                     [
                         html.Div("See details for specific education", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
-                            titles_options,
                             id="detail_select",
-                            placeholder="Vælg uddannelse",
+                            options=[],
+                            placeholder="Vælg en uddannelse fra dine valgte",
                             clearable=True,
                             style=dropdown_style,
                             className="dark-dropdown",
@@ -700,6 +700,21 @@ def update_parallel_plot(*args):
     figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
     legend = build_parcoord_legend(selected_titles, color_map, theme)
     return figure_html, slider_components, color_map, slider_filter, legend, legend
+
+
+# Keep `detail_select` options in sync with the chosen educations (edu1..edu6).
+@app.callback(
+    Output("detail_select", "options"),
+    Output("detail_select", "placeholder"),
+    selection_inputs,
+)
+def update_detail_select_options(*values):
+    # Only allow selecting among the currently chosen educations
+    chosen = [v for v in values if v]
+    if not chosen:
+        return [], "Vælg en uddannelse fra dine valgte"
+    opts = [{"label": t, "value": t} for t in chosen]
+    return opts, "Vælg uddannelse"
 
 
 
