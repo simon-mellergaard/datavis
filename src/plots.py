@@ -1280,10 +1280,9 @@ def build_selection_bubble(
     if np.isclose(sizes.min(), sizes.max()):
         marker_sizes = [0.5 * (min_diam + max_diam) for _ in sizes]
     else:
-        # Scale bubble area linearly between the min and max salary to avoid “flattening” mid-range values.
-        span = sizes.max() - sizes.min()
-        norm = (sizes - sizes.min()) / span
-        areas = min_area + norm * (max_area - min_area)
+        # Direct area proportional to value, then clamp to min/max pixel areas.
+        areas = (sizes / sizes.max()) * max_area
+        areas = np.clip(areas, min_area, max_area)
         marker_sizes = 2 * np.sqrt(areas / np.pi)  # convert area back to diameter for Plotly
 
     colors = []
