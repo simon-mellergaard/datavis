@@ -989,8 +989,8 @@ def build_parallel_coordinates(
             axis_ranges[col] = (vmin, vmax)
             
         else: # scale_mode == "FIXED_SCALE" (Default)
-            # Fixed Scale: Axis range = Fixed 1.0 to 5.0
-            axis_ranges[col] = (1.0, 5.0) 
+            # Fixed Scale: Axis range = Fixed 2.0 to 5.0
+            axis_ranges[col] = (2.0, 5.0) 
     # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
