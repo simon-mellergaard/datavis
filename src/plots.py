@@ -632,7 +632,7 @@ def build_treemap_drill_chart(
         if not np.isnan(nat_mean):
             nat_row = pd.DataFrame({"provider": ["Nationalt gennemsnit"], metric_key: [nat_mean]})
             df_plot = pd.concat([df_plot, nat_row], ignore_index=True)
-            # Ensure chosen providers stay left and national last
+            # Ensure chosen providers stay left and national last (keep this ordering on the x-axis).
             df_plot["order_key"] = df_plot["provider"].apply(lambda x: 1 if x == "Nationalt gennemsnit" else 0)
             df_plot = df_plot.sort_values(["order_key", "provider"], ascending=[True, True])
     else:
@@ -646,8 +646,6 @@ def build_treemap_drill_chart(
         df_plot[metric_key] = df_plot["value"]
         df_plot = df_plot[["provider", metric_key]]
         title_text = f"{label} - Nationalt"
-
-    df_plot = df_plot.sort_values(metric_key, ascending=False).head(8)
 
     money_metrics = {"maanedloen_nyudd", "maanedloen_10aar"}
     likert_metrics = PARCOORD_LIKERT_COLUMNS
@@ -679,8 +677,15 @@ def build_treemap_drill_chart(
 
     df_plot["label"] = df_plot["provider"].apply(_wrap_label)
 
-    colors = bar_colors(len(df_plot))
     ordered_labels = df_plot["label"].tolist()
+    # Use clearer contrast for national vs selected providers, especially in light mode.
+    provider_color = "#1d4ed8" if theme.name == "light" else "#60a5fa"
+    national_color = "#e2e8f0" if theme.name == "light" else "#94a3b8"
+    colors = [provider_color for _ in df_plot["provider"]]
+    nat_mask = df_plot["provider"] == "Nationalt gennemsnit"
+    for i, is_nat in enumerate(nat_mask):
+        if is_nat:
+            colors[i] = national_color
 
     fig = go.Figure(
         go.Bar(
