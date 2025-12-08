@@ -666,14 +666,26 @@ def build_treemap_drill_chart(
         tick_suffix = ""
         x_title = label
 
-    def _wrap_label(name: str, max_len: int = 10, max_lines: int = 2) -> str:
+    def _wrap_label(name: str, max_len: int = 18, max_lines: int = 2) -> str:
         text = str(name)
-        chunks = [text[i : i + max_len] for i in range(0, len(text), max_len)]
-        if len(chunks) > max_lines:
-            chunks = chunks[: max_lines]
-            if len(chunks[-1]) >= 1:
-                chunks[-1] = chunks[-1][: max_len - 1] + "…"
-        return "<br>".join(chunks)
+        words = text.split()
+        lines = []
+        current = ""
+        for w in words:
+            if len(current) + len(w) + (1 if current else 0) <= max_len:
+                current = f"{current} {w}".strip()
+            else:
+                lines.append(current)
+                current = w
+            if len(lines) >= max_lines:
+                break
+        if current and len(lines) < max_lines:
+            lines.append(current)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+        if len(lines) == max_lines and len(words) > len(" ".join(lines).split()):
+            lines[-1] = lines[-1][: max(0, max_len - 1)] + "…"
+        return "<br>".join(lines)
 
     df_plot["label"] = df_plot["provider"].apply(_wrap_label)
 
