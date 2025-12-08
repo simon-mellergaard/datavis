@@ -338,7 +338,8 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
                 html.Div(
                     [
                         html.Div("Ledighed vs karakterer (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
-                        dcc.Graph(id="selection_bubble", style={"height": "460px"}),
+                        html.Div(id="bubble_legend", style={"marginBottom": "12px"}),
+                        dcc.Graph(id="selection_bubble", style={"height": "460px"}, config=dict(displayModeBar=False)),
                         dcc.ConfirmDialog(id="bubble_confirm"),
                     ], style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD}
                 ), 
@@ -648,6 +649,7 @@ def update_selection_summary(*values):
     Output("parcoord_color_store", "data"),
     Output("parcoord_filters_store", "data"),
     Output("parcoord_legend", "children"),
+    Output("bubble_legend", "children"),
     [
         Input("parcoord_vars", "value"),
         *selection_inputs,
@@ -694,7 +696,7 @@ def update_parallel_plot(*args):
     color_map = build_color_map_for_selected(selected_titles, color_store)
     figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
     legend = build_parcoord_legend(selected_titles, color_map, theme)
-    return figure_html, slider_components, color_map, slider_filter, legend
+    return figure_html, slider_components, color_map, slider_filter, legend, legend
 
 
 

@@ -1340,7 +1340,7 @@ def build_selection_bubble(
                     opacity=0.6,
                     line=dict(color=theme.card_border, width=0.5),
                 ),
-                name="Andre",
+                name="Show/hide all educations",
                 customdata=agg.loc[bg_mask, "titel"],
             )
         )
@@ -1363,6 +1363,7 @@ def build_selection_bubble(
                     line=dict(color=theme.card_border, width=1),
                 ),
                 name="Match",
+                showlegend=False,
                 customdata=agg.loc[fg_mask, "titel"],
             )
         )
