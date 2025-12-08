@@ -322,7 +322,7 @@ educations in that specific city, or educations on national level. The sliders
 highlight the educations that match the selected criteria, and are shown in the
 bubble chart below. Hover over the name of the slider name to view details for the
 likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
-                        html.Div("Filter educations by education (Hover for details):", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("Filter educations by variable (hover for details):", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div(id="parcoord_sliders", style={"maxHeight": "640px", "overflowY": "auto"}),
                     ],
                     style={"flex": "1 1 220px", "minWidth": "220px", **CUSTOM_CARD},
@@ -343,18 +343,14 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
                 ), 
                 html.Div(
                     [
-                        html.Div("Detaljer for specifik uddannelse", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("See details for specific education", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
                             titles_options,
                             id="detail_select",
                             placeholder="Vælg uddannelse",
                             clearable=True,
-                            style={
-                                "marginBottom": "10px",
-                                "backgroundColor": "var(--control-bg)",
-                                "color": FONT_COL,
-                                "border": "1px solid var(--control-border)",
-                            },
+                            style=dropdown_style,
+                            className="dark-dropdown",
                         ),
                         html.Div(id="detail_table", style={"overflowY": "auto"}),
                     ], style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD},
