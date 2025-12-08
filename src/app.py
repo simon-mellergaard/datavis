@@ -199,7 +199,6 @@ app.layout = html.Div(
                                             ]
                                         ),
 
-
                                         html.Div(
                                             [
                                                 html.Div(
@@ -320,16 +319,16 @@ app.layout = html.Div(
                         html.H3("Parallel Coordinates Plot", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div("""The plot shows the variables across all
 educations in that specific city, or educations on national level. The sliders
-highlight the educations that match the selected criteria, and are shown in the
+select the educations that match the criteria, and are shown in the
 bubble chart below. Hover over the name of the slider name to view details for the
-likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
+likert variables.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                         html.Div(
                             [
-                                html.Label("Axis scale:"),
+                                html.Label("Axis scale:", style={"fontWeight": "600"}),
                                 dcc.RadioItems(
                                     id="parcoord_scale_mode",
                                     options=[
-                                        {"label": "Fixed 2-5", "value": "FIXED_SCALE"},
+                                        {"label": "Fixed (2-5)", "value": "FIXED_SCALE"},
                                         {"label": "Global min/max", "value": "DATA_SCALE"},
                                     ],
                                     value="FIXED_SCALE",
@@ -369,7 +368,7 @@ students.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "i
                         dcc.Dropdown(
                             id="detail_select",
                             options=[],
-                            placeholder="Vælg en uddannelse fra dine valgte",
+                            placeholder="Choose an education from your selected list",
                             clearable=True,
                             style=dropdown_style,
                             className="dark-dropdown",
