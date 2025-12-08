@@ -1145,9 +1145,9 @@ def build_selection_bubble(
     sizes = agg["bubble_size"].astype(float)
     size_min, size_max = sizes.min(), sizes.max()
     if np.isclose(size_min, size_max):
-        marker_sizes = [32 for _ in sizes]
+        marker_sizes = [38 for _ in sizes]
     else:
-        marker_sizes = 20 + 80 * (sizes - size_min) / max(size_max - size_min, 1e-9)
+        marker_sizes = 26 + 70 * (sizes - size_min) / max(size_max - size_min, 1e-9)
 
     colors = []
     for t, match in zip(agg["titel"], agg["match_filter"]):
@@ -1158,10 +1158,16 @@ def build_selection_bubble(
         else:
             colors.append("#adb5bd")  # background (only shown if no sliders)
 
-    hover_text = [
-        f"<b>{row['titel']}</b><br>Ledighed: {row['ledighed_num']:.1f}%<br>Løn (nyudd.): {row['lon_num']:.0f}<br>Kvote 1: {row['bubble_size']:.2f}"
-        for _, row in agg.iterrows()
-    ]
+    hover_text = []
+    for _, row in agg.iterrows():
+        salary = row["bubble_size"]
+        kvote = row["lon_num"]
+        hover_text.append(
+            f"<b>{row['titel']}</b>"
+            f"<br>Ledighed: {row['ledighed_num']:.1f}%"
+            f"<br>Løn (nyudd.): {salary:,.0f}"
+            f"<br>Kvote 1: {kvote:.2f}"
+        )
 
     # Foreground: selected or filter matches
     fg_mask = (agg["titel"].isin(selected_set)) | agg["match_filter"]
@@ -1180,7 +1186,7 @@ def build_selection_bubble(
                 hovertext=[hover_text[i] for i, m in enumerate(bg_mask) if m],
                 hoverinfo="text",
                 marker=dict(
-                    size=(np.array(marker_sizes)[bg_mask] * 0.6).tolist(),
+                    size=np.array(marker_sizes)[bg_mask],
                     color="#adb5bd",
                     opacity=0.6,
                     line=dict(color=theme.card_border, width=0.5),
@@ -1214,8 +1220,8 @@ def build_selection_bubble(
 
     fig.update_traces(cliponaxis=False)
     fig.update_layout(
-        xaxis_title="Ledighed (nyudd.)",
-        yaxis_title="Løn (nyudd.)",
+        xaxis_title="Karakterer (kvote 1)",
+        yaxis_title="Ledighed (nyudd.)",
         margin=dict(t=40, l=50, r=30, b=50),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
