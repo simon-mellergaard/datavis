@@ -327,88 +327,6 @@ def build_detail_table(data: DataBundle, edu_title: str):
     return table, providers_small
 
 
-def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) -> go.Figure:
-    theme = theme or DEFAULT_THEME
-    if providers_df.empty:
-        fig = go.Figure()
-        fig.update_layout(
-            template=theme.template,
-            paper_bgcolor=theme.app_bg,
-            plot_bgcolor=theme.plot_bg,
-            margin=dict(t=0, l=0, r=0, b=0),
-            font_color=theme.font,
-        )
-        return fig
-
-    providers_geo = ensure_latlon_from_municipality(providers_df)
-    if "kvote_1_kvotient" in providers_geo.columns:
-        providers_geo["kvote_num"] = to_num(providers_geo["kvote_1_kvotient"])
-    if "standby_8" in providers_geo.columns:
-        providers_geo["standby_num"] = to_num(providers_geo["standby_8"])
-
-    providers_geo = providers_geo.dropna(subset=["inst_lat", "inst_lon"])
-    if providers_geo.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="Ingen koordinater og ingen kendt kommune-match.",
-            showarrow=False,
-            font=dict(color=theme.font, size=12),
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-        )
-        fig.update_layout(
-            template=theme.template,
-            paper_bgcolor=theme.app_bg,
-            plot_bgcolor=theme.plot_bg,
-            margin=dict(t=0, l=0, r=0, b=0),
-            font_color=theme.font,
-        )
-        return fig
-
-    hover_cols = [
-        col
-        for col in ["instkommunetx", "instregiontx", "titel", "kvote_num", "standby_num"]
-        if col in providers_geo.columns
-    ]
-    fig = px.scatter_mapbox(
-        providers_geo,
-        lat="inst_lat",
-        lon="inst_lon",
-        hover_name="hovedinsttx",
-        hover_data=hover_cols,
-        zoom=6,
-        height=520,
-    )
-    fig.update_traces(marker=dict(size=14))  # make provider dots easier to see
-
-    latitudes = providers_geo["inst_lat"].astype(float)
-    longitudes = providers_geo["inst_lon"].astype(float)
-    lat_span = float(latitudes.max() - latitudes.min()) if len(latitudes) else 0.0
-    lon_span = float(longitudes.max() - longitudes.min()) if len(longitudes) else 0.0
-    center_lat = float(latitudes.mean()) if len(latitudes) else 56.0
-    center_lon = float(longitudes.mean()) if len(longitudes) else 10.5
-
-    zoom = 6.0
-    span = max(lat_span, lon_span)
-    if span < 0.8:
-        zoom = 7.5
-    elif span > 6:
-        zoom = 5.2
-
-    fig.update_layout(
-        mapbox_style="open-street-map",
-        mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
-        template=theme.template,
-        paper_bgcolor=theme.app_bg,
-        plot_bgcolor=theme.plot_bg,
-        font_color=theme.font,
-        margin=dict(t=0, l=0, r=0, b=0),
-    )
-    return fig
-
-
 def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
     """Simplified map for provider locations using dash-leaflet."""
     theme = theme or DEFAULT_THEME
@@ -908,6 +826,12 @@ def build_city_treemap(
     )
     marker_dict["cmin"] = marker_cmin
     marker_dict["cmax"] = marker_cmax
+    # Ensure treemap rectangles have a clear border color (theme-specific)
+    try:
+        marker_dict["line"] = dict(color=theme.treemap_border, width=0.6)
+    except Exception:
+        # Fallback to card border if the theme doesn't provide treemap_border
+        marker_dict["line"] = dict(color=theme.card_border, width=0.6)
 
     fig = go.Figure(
         go.Treemap(
@@ -966,10 +890,10 @@ def build_parallel_coordinates(
     selected_list = [t for t in selected_titles if t]
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
-    # --- AXIS RANGE CALCULATION SWITCH ---
-    scaling_df = df.copy().dropna(subset=columns)
+    # --- AXIS RANGE CALCULATION ---
+    # Use data-driven min/max per variable (respecting allowed_titles), with a tiny pad when identical.
     axis_ranges: Dict[str, Tuple[float, float]] = {}
-    
+    scaling_df = df.copy().dropna(subset=columns)
     for col in columns:
         if scale_mode == "DYNAMIC_SCALE":
             # Dynamic Scale: Axis range = Variable's min/max in filtered data
@@ -1099,15 +1023,21 @@ def build_parallel_coordinates(
     hover_renderers = []
     
     # --- PLOTTING LINES ---
+    base_line_color = "#7a7a7a" if theme.name == "light" else "#a0a0a0"
+    base_line_alpha = 0.35 if theme.name == "light" else 0.22
+    selected_alpha = 1.0
+    selected_width = 3.5 if theme.name == "light" else 3.0
+    base_width = 1.3 if theme.name == "light" else 1.0
+
     if filtered_xs:
         source = ColumnDataSource(dict(xs=filtered_xs, ys=filtered_ys, title=filtered_titles))
         p.multi_line(
-            "xs", 
-            "ys", 
-            source=source, 
-            line_color="#BBBBBB",
-            line_alpha=0.18,
-            line_width=1
+            "xs",
+            "ys",
+            source=source,
+            line_color=base_line_color,
+            line_alpha=base_line_alpha,
+            line_width=base_width,
         )
     
     if selected_xs:
@@ -1118,7 +1048,7 @@ def build_parallel_coordinates(
         source = ColumnDataSource(
             dict(xs=selected_xs, ys=selected_ys, title=selected_titles_list, color=selected_colors, details=tooltip_texts)
         )
-        r = p.multi_line("xs", "ys", source=source, line_color="color", line_alpha=0.95, line_width=3)
+        r = p.multi_line("xs", "ys", source=source, line_color="color", line_alpha=selected_alpha, line_width=selected_width)
         hover_renderers.append(r)
 
     if hover_renderers:
