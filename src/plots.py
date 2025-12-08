@@ -1075,6 +1075,7 @@ def build_parcoord_sliders(
     likert_columns: Set[str] | None = None,
     labels: Dict[str, str] | None = None,
     tooltips: Dict[str, str] | None = None,
+    theme: Theme | None = None,
 ) -> Tuple[List[html.Div], Dict[str, Sequence[float]]]:
     """
     Fixed version – integer marks (3.0, 4.0, 5.0, etc.) are guaranteed to appear.
@@ -1086,6 +1087,7 @@ def build_parcoord_sliders(
     if tooltips is None:
         tooltips = PARCOORD_TOOLTIPS
 
+    theme = theme or DEFAULT_THEME
     components: List[html.Div] = []
     slider_filter: Dict[str, Sequence[float]] = {}
     df = data.df
@@ -1161,10 +1163,43 @@ def build_parcoord_sliders(
         label_text = labels.get(col, col)
         label_tooltip = tooltips.get(col, "")
 
+        # Small distribution preview above each slider
+        span = max_val - min_val
+        bin_count = max(5, min(40, int(np.ceil(span * 10)) if span > 0 else 5))
+        hist_vals, hist_edges = np.histogram(series, bins=bin_count, range=(min_val, max_val))
+        hist_x = (hist_edges[:-1] + hist_edges[1:]) / 2
+        hist_fig = go.Figure(
+            go.Bar(
+                x=hist_x,
+                y=hist_vals,
+                marker=dict(
+                    color="#94a3b8" if (theme or DEFAULT_THEME).name == "light" else "#6b7280",
+                    line=dict(color="#e5e7eb" if (theme or DEFAULT_THEME).name == "light" else "#374151", width=0.6),
+                ),
+            )
+        )
+        hist_fig.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=80,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            bargap=0.02,
+        )
+
         components.append(
             html.Div(
-                [html.Label(label_text, title=label_tooltip), slider],
-                style={"marginBottom": "16px"},
+                [
+                    dcc.Graph(
+                        figure=hist_fig,
+                        config={"displayModeBar": False, "staticPlot": True},
+                        style={"height": "80px", "marginBottom": "-2px"},
+                    ),
+                    html.Label(label_text, title=label_tooltip),
+                    slider,
+                ],
+                style={"marginBottom": "18px"},
             )
         )
 

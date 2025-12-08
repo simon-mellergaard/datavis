@@ -700,7 +700,7 @@ def update_parallel_plot(*args):
     if not reset_sliders and slider_ids and slider_values:
         prev_slider_values = {sid["column"]: val for sid, val in zip(slider_ids, slider_values)}
 
-    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles)
+    slider_components, slider_filter = build_parcoord_sliders(data, chosen, prev_slider_values, allowed_titles, theme=theme)
     selected_titles = [t for t in selections if t]
     color_map = build_color_map_for_selected(selected_titles, color_store)
     figure_html = build_parallel_coordinates(
