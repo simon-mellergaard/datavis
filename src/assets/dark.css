@@ -62,3 +62,29 @@ body {
 .dark-dropdown .Select-option.is-selected {
   background-color: rgba(59, 130, 246, 0.18) !important;
 }
+
+/* --- Dash RangeSlider Theme --- */
+
+/* The default active color is the bright blue (#3b82f6) used in the dropdown focus/hover state.
+   We override it here using a dark grey to match the dark theme.
+*/
+
+.dark-slider-track .rc-slider-track {
+    /* Sets the color of the active (filled) portion of the track */
+    background-color: #444d5c !important; 
+}
+
+.dark-slider-track .rc-slider-handle {
+    /* Sets the color of the slider handles */
+    border-color: #444d5c !important;
+}
+
+.dark-slider-track .rc-slider-dot-active {
+    /* Sets the color of the active dots/marks */
+    border-color: #444d5c !important;
+}
+
+.dark-slider-track .rc-slider-rail {
+    /* Sets the color of the inactive (unfilled) portion of the track */
+    background-color: var(--card-border) !important; 
+}

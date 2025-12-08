@@ -9,5 +9,6 @@ altair==5.5.0       # If using vega-altair
 squarify==0.4.4
 plotly==5.24.1     # Interactive charts, needed for dendrogram
 dash==2.18.2        # Web framework for interactive drill-down
+dash-leaflet==1.0.9
 nbformat==5.10.4
 ipywidgets==8.1.8

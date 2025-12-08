@@ -28,6 +28,7 @@ from plots import (
     build_providers_map,
     build_selection_bubble,
     build_treemap_drill_chart,
+    build_leaflet_map,
 )
 from theme import CUSTOM_BG, CUSTOM_CARD, FONT_COL, get_theme
 
@@ -366,7 +367,7 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
         html.Div(
             [
 
-                html.Div([dcc.Graph(id="detail_map", style={"height": "520px"})], style={"flex": "1 1 520px", "minWidth": "420px"}),
+                html.Div(id="detail_map_container", style={"flex": "1 1 520px", "minWidth": "420px", **CUSTOM_CARD}),
             ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
 
@@ -726,7 +727,7 @@ def update_selection_bubble(*args):
 
 @app.callback(
     Output("detail_table", "children"),
-    Output("detail_map", "figure"),
+    Output("detail_map_container", "children"),
     Input("detail_select", "value"),
     Input("theme_store", "data"),
 )
@@ -735,12 +736,11 @@ def update_detail_panel(edu_title, theme_name):
     theme = get_theme(theme_name)
     if not edu_title or edu_title not in data.available_set:
         empty_text = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color": theme.font})
-        empty_map = go.Figure()
-        empty_map.update_layout(template=theme.template, paper_bgcolor=theme.app_bg, plot_bgcolor=theme.plot_bg, font_color=theme.font)
+        empty_map = html.Div("Ingen uddannelse valgt.", style={"color": theme.muted_text, "padding": "12px"})
         return empty_text, empty_map
     table, providers_small = build_detail_table(data, edu_title)
-    map_fig = build_providers_map(providers_small, theme)
-    return table, map_fig
+    leaflet_map = build_leaflet_map(providers_small, theme)
+    return table, leaflet_map
 
 
 
