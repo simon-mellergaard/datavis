@@ -191,3 +191,87 @@ def build_flow_df(data: DataBundle, selected_bachelors: Iterable[str]) -> pd.Dat
         )
         .sort_values("weight", ascending=False)
     )
+
+
+
+def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) -> go.Figure:
+    theme = theme or DEFAULT_THEME
+    if providers_df.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
+            margin=dict(t=0, l=0, r=0, b=0),
+            font_color=theme.font,
+        )
+        return fig
+
+    providers_geo = ensure_latlon_from_municipality(providers_df)
+    if "kvote_1_kvotient" in providers_geo.columns:
+        providers_geo["kvote_num"] = to_num(providers_geo["kvote_1_kvotient"])
+    if "standby_8" in providers_geo.columns:
+        providers_geo["standby_num"] = to_num(providers_geo["standby_8"])
+
+    providers_geo = providers_geo.dropna(subset=["inst_lat", "inst_lon"])
+    if providers_geo.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Ingen koordinater og ingen kendt kommune-match.",
+            showarrow=False,
+            font=dict(color=theme.font, size=12),
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_layout(
+            template=theme.template,
+            paper_bgcolor=theme.app_bg,
+            plot_bgcolor=theme.plot_bg,
+            margin=dict(t=0, l=0, r=0, b=0),
+            font_color=theme.font,
+        )
+        return fig
+
+    hover_cols = [
+        col
+        for col in ["instkommunetx", "instregiontx", "titel", "kvote_num", "standby_num"]
+        if col in providers_geo.columns
+    ]
+    fig = px.scatter_mapbox(
+        providers_geo,
+        lat="inst_lat",
+        lon="inst_lon",
+        hover_name="hovedinsttx",
+        hover_data=hover_cols,
+        zoom=6,
+        height=520,
+    )
+    fig.update_traces(marker=dict(size=14))  # make provider dots easier to see
+
+    latitudes = providers_geo["inst_lat"].astype(float)
+    longitudes = providers_geo["inst_lon"].astype(float)
+    lat_span = float(latitudes.max() - latitudes.min()) if len(latitudes) else 0.0
+    lon_span = float(longitudes.max() - longitudes.min()) if len(longitudes) else 0.0
+    center_lat = float(latitudes.mean()) if len(latitudes) else 56.0
+    center_lon = float(longitudes.mean()) if len(longitudes) else 10.5
+
+    zoom = 6.0
+    span = max(lat_span, lon_span)
+    if span < 0.8:
+        zoom = 7.5
+    elif span > 6:
+        zoom = 5.2
+
+    fig.update_layout(
+        mapbox_style="open-street-map",
+        mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
+        template=theme.template,
+        paper_bgcolor=theme.app_bg,
+        plot_bgcolor=theme.plot_bg,
+        font_color=theme.font,
+        margin=dict(t=0, l=0, r=0, b=0),
+    )
+    return fig
+
