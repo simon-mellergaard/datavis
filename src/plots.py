@@ -1179,6 +1179,15 @@ def build_selection_bubble(
     bg_mask = ~fg_mask
     show_background = not bool(slider_filter)
 
+    # Set sensible y-range; allow a small buffer below zero so bubbles don't clip,
+    # but only show tick labels from 0% and up.
+    y_min = float(agg["ledighed_num"].min())
+    y_buffer = 8.0
+    y_min_range = min(-6.0, y_min - y_buffer)
+    y_max = float(agg["ledighed_num"].max()) + 10.0
+    ticks = list(np.arange(0, max(10.0, y_max + 1.0), 5.0))
+    ticktext = [f"{int(t)}%" for t in ticks]
+
     # Draw background (non-selected) points first so selected/matched points
     # added later will appear on top.
     if show_background and bg_mask.any():
@@ -1227,6 +1236,13 @@ def build_selection_bubble(
     fig.update_layout(
         xaxis_title="Karakterer (kvote 1)",
         yaxis_title="Ledighed (nyudd.)",
+        yaxis=dict(
+            hoverformat=".1f%%",
+            range=[y_min_range, y_max],
+            tickvals=ticks,
+            ticktext=ticktext,
+            tickmode="array",
+        ),
         margin=dict(t=40, l=50, r=30, b=50),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
