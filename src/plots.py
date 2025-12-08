@@ -654,7 +654,7 @@ def build_treemap_drill_chart(
         yaxis=dict(
             showgrid=False,
             tickfont=dict(color=theme.font),
-            title=title_text,
+            title="",  # move title to top annotation for cleaner bars
             tickformat=tick_format,
             ticksuffix=tick_suffix,
             automargin=True,
@@ -663,6 +663,15 @@ def build_treemap_drill_chart(
         ),
         showlegend=False,
         bargap=0.45,
+    )
+    fig.add_annotation(
+        text=title_text,
+        x=0.5,
+        y=1.08,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        font=dict(color=theme.font, size=12),
     )
     return fig
 
