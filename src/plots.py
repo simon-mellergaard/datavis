@@ -232,9 +232,6 @@ def build_detail_table(data: DataBundle, edu_title: str):
         label: mode_str(providers.get(col, pd.Series(dtype=object)))
         for col, label in [
             ("foerstejob1tx", "Første job #1"),
-            ("foerstejob2tx", "Første job #2"),
-            ("foerstejob3tx", "Første job #3"),
-            ("foerstejob4tx", "Første job #4"),
         ]
     }
 
@@ -271,7 +268,7 @@ def build_detail_table(data: DataBundle, edu_title: str):
     jobs = [s for s in strings.values() if s]
     if jobs:
         # Header row with the first job
-        rows.append(html.Tr([html.Th("Første job (typisk)"), html.Td(jobs[0])]))
+        rows.append(html.Tr([html.Th("Hyppigste vej til første job"), html.Td(jobs[0])]))
         # Additional jobs on their own rows with an empty first cell for alignment
         for job in jobs[1:]:
             rows.append(html.Tr([html.Th(""), html.Td(job)]))
@@ -340,7 +337,7 @@ def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
         return html.Div("Ingen koordinater fundet for denne uddannelse.", style={"color": theme.font})
 
     # Fixed Denmark view; markers move, viewport stays consistent.
-    center_lat, center_lon = 55.0, 11.0
+    center_lat, center_lon = 54.8, 11.0
     zoom = 6.0
     bounds = None
 
