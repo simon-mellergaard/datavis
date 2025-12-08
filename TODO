@@ -2,7 +2,6 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
 * Bubble tilføj legend
 * CHR values in the information box for "Detaljer for specifik uddannelse" needs to be changed since it just shows as one big string now
-* Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
 * Double check colour blind safety (take a few SS and put into colour blind checker)
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
@@ -20,3 +19,4 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Fix the text inside the treemap cells to not show % of parent
 * The name for filter for municipality should probably also be changed since it is done on cities not municipalities
 * Fjerne variabler som ikke er likert fra paralel coordinates
+* Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read

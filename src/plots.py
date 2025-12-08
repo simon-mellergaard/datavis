@@ -80,7 +80,13 @@ PARCOORD_VARIABLES = [
     # "maanedloen_nyudd",
     # "maanedloen_10aar",
 ]
-PARCOORD_DEFAULT_VARS = PARCOORD_VARIABLES[:5]
+PARCOORD_DEFAULT_VARS = [
+    "fagligmiljo_likert",
+    "socialtmiljo_likert",
+    "tilpas_likert",
+    "stress_daglig_likert",
+    "undervisere_engagerede_likert",
+]
 PARCOORD_LIKERT_COLUMNS = {
     "fagligmiljo_likert",
     "arbmedstud_likert",
