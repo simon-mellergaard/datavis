@@ -1063,6 +1063,7 @@ def build_parcoord_sliders(
             marks=marks,
             tooltip={"placement": "bottom", "always_visible": False},
             allowCross=False,
+            className="dark-slider-track" #Change slider colour
         )
         # Use a label with a `title` so hovering shows a tooltip with a short explanation.
         label_text = PARCOORD_LABELS.get(col, col)
