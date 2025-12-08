@@ -36,7 +36,7 @@ data = load_data()
 
 ASSETS_PATH = Path(__file__).resolve().parents[0] / "assets"
 
-app = Dash(__name__, assets_folder=str(ASSETS_PATH))
+app = Dash(__name__, assets_folder=str(ASSETS_PATH), title="Education Dashboard")
 
 TREEMAP_PROMPT = "Click an education cell in the treemap to add it for comparison."
 
@@ -366,7 +366,6 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
 
         html.Div(
             [
-
                 html.Div(id="detail_map_container", style={"flex": "1 1 520px", "minWidth": "420px", **CUSTOM_CARD}),
             ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
         ),
