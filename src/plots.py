@@ -737,12 +737,13 @@ def build_city_treemap(
                 scaled.append([mapped, color])
         marker_colorscale = scaled
 
+    currency_label = ""
+    if metric_label == "Løn (nyudd.) (gennemsnit)":
+        currency_label = " kr."
     hover_text = (
-        f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>"
-        "%{percentParent:.1%} af niveauet over<br>"
-        "%{percentEntry:.1%} af totalen<extra></extra>"
+        f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}{currency_label}"
     )
-
+    text_template = f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}{currency_label}"
     marker_dict = dict(
         colors=color_values,
         colorscale=marker_colorscale,
@@ -763,7 +764,7 @@ def build_city_treemap(
             values=df_new["value"],
             branchvalues="total",
             marker=marker_dict,
-            texttemplate=f"<b>%{{label}}</b><br>{metric_label}: %{{value:,.0f}}<br>%{{percentParent:.1%}}",
+            texttemplate=text_template,
             textfont=dict(color=text_colors),
             hovertemplate=hover_text,
             maxdepth=3,
