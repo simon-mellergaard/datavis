@@ -361,7 +361,7 @@ students.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "i
                         html.Div(id="bubble_legend", style={"marginBottom": "12px"}),
                         dcc.Graph(id="selection_bubble", style={"height": "460px"}, config=dict(displayModeBar=False)),
                         dcc.ConfirmDialog(id="bubble_confirm"),
-                    ], style={"flex": "1 1 360px", "minWidth": "320px", **CUSTOM_CARD}
+                    ], style={"flex": "1 1 480px", "minWidth": "420px", **CUSTOM_CARD}
                 ), 
                 html.Div(
                     [
@@ -380,16 +380,6 @@ students.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "i
             ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}
         ), 
         
-        
-        
-        html.Hr(style={"borderColor": "var(--divider)"}),
-
-        html.Div(
-            [
-                html.Div(id="detail_map_container", style={"flex": "1 1 520px", "minWidth": "420px", **CUSTOM_CARD}),
-            ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
-        ),
-
 
         dcc.Store(id="treemap_pending"),
         dcc.Store(id="parcoord_color_store", data={}),
@@ -764,25 +754,97 @@ def update_selection_bubble(*args):
 
 
 
-
 @app.callback(
     Output("detail_table", "children"),
-    Output("detail_map_container", "children"),
     Input("detail_select", "value"),
     Input("theme_store", "data"),
 )
-
-def update_detail_panel(edu_title, theme_name):
+def update_detail_panel(edu_title: str | None, theme_name: str):
     theme = get_theme(theme_name)
+
     if not edu_title or edu_title not in data.available_set:
-        empty_text = html.Div("Vælg en uddannelse ovenfor for at se detaljer.", style={"color": theme.font})
-        empty_map = html.Div("Ingen uddannelse valgt.", style={"color": theme.muted_text, "padding": "12px"})
-        return empty_text, empty_map
+        return html.Div(
+            "Vælg en uddannelse ovenfor for at se detaljer.",
+            style={
+                "color": theme.muted_text,
+                "fontStyle": "italic",
+                "padding": "60px 20px",
+                "textAlign": "center",
+                "fontSize": "17px",
+            }
+        )
+
     table, providers_small = build_detail_table(data, edu_title)
-    leaflet_map = build_leaflet_map(providers_small, theme)
-    return table, leaflet_map
 
+    map_component = (
+        build_leaflet_map(providers_small, theme)
+        if not providers_small.empty
+        else html.Div(
+            "Ingen udbydere med koordinater",
+            style={
+                "height": "100%",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "color": theme.muted_text,
+                "fontStyle": "italic",
+            }
+        )
+    )
 
+    return html.Div(
+        style={
+            "position": "relative",
+            "background": theme.card_bg,
+            "borderRadius": "12px",
+            "padding": "28px",
+            "boxShadow": "0 6px 24px rgba(0,0,0,0.1)",
+            "border": f"1px solid {theme.card_border}",
+            "overflow": "hidden",
+        },
+        children=[
+            html.H3(
+                edu_title,
+                style={"margin": "0 0 24px 0", "fontSize": "24px", "fontWeight": "600", "paddingRight": "380px"},
+            ),
+            html.Div(table, style={"paddingRight": "400px", "boxSizing": "border-box"}),
+            html.Div(
+                children=[
+                    html.Div(
+                        "Udbud i Danmark",
+                        style={
+                            "position": "absolute",
+                            "top": "12px",
+                            "left": "14px",
+                            "background": "rgba(255,255,255,0.96)",
+                            "color": "#1a1a1a",
+                            "padding": "6px 12px",
+                            "borderRadius": "8px",
+                            "fontSize": "13px",
+                            "fontWeight": "600",
+                            "zIndex": 100,
+                            "boxShadow": "0 2px 8px rgba(0,0,0,0.15)",
+                            "pointerEvents": "none",
+                        }
+                    ),
+                    map_component
+                ],
+                style={
+                    "position": "absolute",
+                    "top": "92px",
+                    "right": "28px",
+                    "width": "360px",
+                    "height": "300px",
+                    "borderRadius": "12px",
+                    "overflow": "hidden",
+                    "boxShadow": "0 12px 36px rgba(0,0,0,0.22)",
+                    "zIndex": 10,
+                    "border": f"2px solid {theme.card_border}",
+                    "background": "white",
+                }
+            ),
+        ]
+    )
 
 if __name__ == "__main__":
     app.run_server(debug=True)
