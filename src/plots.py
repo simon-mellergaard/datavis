@@ -414,20 +414,10 @@ def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
     if providers_geo.empty:
         return html.Div("Ingen koordinater fundet for denne uddannelse.", style={"color": theme.font})
 
-    latitudes = providers_geo["inst_lat"].astype(float)
-    longitudes = providers_geo["inst_lon"].astype(float)
-    center_lat = float(latitudes.mean()) if len(latitudes) else 56.0
-    center_lon = float(longitudes.mean()) if len(longitudes) else 10.5
+    # Fixed Denmark view; markers move, viewport stays consistent.
+    center_lat, center_lon = 56.0, 10.5
+    zoom = 7.0
     bounds = None
-    zoom = 6
-    if len(providers_geo) == 1:
-        zoom = 11
-    elif len(providers_geo) > 1:
-        lat_min, lat_max = float(latitudes.min()), float(latitudes.max())
-        lon_min, lon_max = float(longitudes.min()), float(longitudes.max())
-        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
-
-    coord_key = "-".join([f"{la:.4f}_{lo:.4f}" for la, lo in zip(latitudes, longitudes)])
 
     markers = []
     for _, row in providers_geo.iterrows():
@@ -482,11 +472,15 @@ def build_leaflet_map(providers_df: pd.DataFrame, theme: Theme | None = None):
     marker_layer = dl.LayerGroup(markers) if markers else None
 
     return dl.Map(
-        id=f"detail_leaflet_{coord_key}",
+        id="detail_leaflet_map",
         center=(center_lat, center_lon),
         zoom=zoom if bounds is None else None,  # let bounds drive zoom when present
         bounds=bounds,
         boundsOptions={"padding": [20, 20]},
+        zoomControl=False,
+        scrollWheelZoom=False,
+        doubleClickZoom=False,
+        touchZoom=False,
         children=[
             dl.TileLayer(
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
