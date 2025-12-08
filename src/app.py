@@ -330,7 +330,7 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
                                     id="parcoord_scale_mode",
                                     options=[
                                         {"label": "Fixed 2-5", "value": "FIXED_SCALE"},
-                                        {"label": "Data min/max", "value": "DATA_SCALE"},
+                                        {"label": "Global min/max", "value": "DATA_SCALE"},
                                     ],
                                     value="FIXED_SCALE",
                                     labelStyle={"marginRight": "12px"},
