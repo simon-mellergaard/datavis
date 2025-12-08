@@ -966,25 +966,17 @@ def build_parallel_coordinates(
     selected_list = [t for t in selected_titles if t]
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
-    # --- AXIS RANGE CALCULATION SWITCH ---
-    scaling_df = df.copy().dropna(subset=columns)
+    # --- AXIS RANGE CALCULATION ---
+    # Use data-driven min/max per variable (respecting allowed_titles), with a tiny pad when identical.
     axis_ranges: Dict[str, Tuple[float, float]] = {}
-    
+    scaling_df = df.copy().dropna(subset=columns)
     for col in columns:
-        if scale_mode == "DYNAMIC_SCALE":
-            # Dynamic Scale: Axis range = Variable's min/max in filtered data
-            series = scaling_df[col].astype(float)
-            vmin = float(series.min())
-            vmax = float(series.max())
-            
-            if np.isclose(vmin, vmax):
-                vmax = vmin + 1.0
-            
-            axis_ranges[col] = (vmin, vmax)
-            
-        else: # scale_mode == "FIXED_SCALE" (Default)
-            # Fixed Scale: Axis range = Fixed 1.0 to 5.0
-            axis_ranges[col] = (1.0, 5.0) 
+        series = scaling_df[col].astype(float)
+        vmin = float(series.min())
+        vmax = float(series.max())
+        if np.isclose(vmin, vmax):
+            vmax = vmin + 0.1
+        axis_ranges[col] = (vmin, vmax)
     # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
@@ -1099,15 +1091,21 @@ def build_parallel_coordinates(
     hover_renderers = []
     
     # --- PLOTTING LINES ---
+    base_line_color = "#7a7a7a" if theme.name == "light" else "#a0a0a0"
+    base_line_alpha = 0.35 if theme.name == "light" else 0.22
+    selected_alpha = 1.0
+    selected_width = 3.5 if theme.name == "light" else 3.0
+    base_width = 1.3 if theme.name == "light" else 1.0
+
     if filtered_xs:
         source = ColumnDataSource(dict(xs=filtered_xs, ys=filtered_ys, title=filtered_titles))
         p.multi_line(
-            "xs", 
-            "ys", 
-            source=source, 
-            line_color="#BBBBBB",
-            line_alpha=0.18,
-            line_width=1
+            "xs",
+            "ys",
+            source=source,
+            line_color=base_line_color,
+            line_alpha=base_line_alpha,
+            line_width=base_width,
         )
     
     if selected_xs:
@@ -1118,7 +1116,7 @@ def build_parallel_coordinates(
         source = ColumnDataSource(
             dict(xs=selected_xs, ys=selected_ys, title=selected_titles_list, color=selected_colors, details=tooltip_texts)
         )
-        r = p.multi_line("xs", "ys", source=source, line_color="color", line_alpha=0.95, line_width=3)
+        r = p.multi_line("xs", "ys", source=source, line_color="color", line_alpha=selected_alpha, line_width=selected_width)
         hover_renderers.append(r)
 
     if hover_renderers:
