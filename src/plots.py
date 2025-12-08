@@ -1352,7 +1352,7 @@ def build_selection_bubble(
         hover_text.append(
             f"<b>{row['titel']}</b>"
             f"<br>Ledighed: {row['ledighed_num']:.1f}%"
-            f"<br>Løn (nyudd.): {salary:,.0f}"
+            f"<br>Løn (nyudd.): {salary:,.0f} kr."
             f"<br>Kvote 1: {kvote:.2f}"
         )
 
@@ -1414,6 +1414,17 @@ def build_selection_bubble(
                 customdata=agg.loc[fg_mask, "titel"],
             )
         )
+
+    # Ensure that 'Match' traces are rendered on top of background points.
+    try:
+        traces = list(fig.data)
+        match_traces = [t for t in traces if getattr(t, "name", "") == "Match"]
+        other_traces = [t for t in traces if getattr(t, "name", "") != "Match"]
+        # Reassign so non-match traces come first, match traces last (on top)
+        fig.data = tuple(other_traces + match_traces)
+    except Exception:
+        # If reordering fails for any reason, continue without raising.
+        pass
 
     fig.update_traces(cliponaxis=False)
     fig.update_layout(

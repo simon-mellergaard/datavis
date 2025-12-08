@@ -318,6 +318,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
+                        html.H3("Parallel Coordinates Plot", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div("""The plot shows the variables across all
 educations in that specific city, or educations on national level. The sliders
 highlight the educations that match the selected criteria, and are shown in the
@@ -337,7 +338,11 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
             [
                 html.Div(
                     [
-                        html.Div("Ledighed vs karakterer (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.H3("Unemployment, grades and salary", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("""The bubble chart highlights the selected
+educations from the treemap, to compare their unemployment rate and average
+grades (kvote 1). The size of the bubbles represents the salary of newly graduated
+students.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                         html.Div(id="bubble_legend", style={"marginBottom": "12px"}),
                         dcc.Graph(id="selection_bubble", style={"height": "460px"}, config=dict(displayModeBar=False)),
                         dcc.ConfirmDialog(id="bubble_confirm"),
