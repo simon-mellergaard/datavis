@@ -318,6 +318,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
+                        html.H3("Parallel Coordinates Plot", style={"fontWeight": "600", "marginBottom": "6px"}),
                         html.Div("""The plot shows the variables across all
 educations in that specific city, or educations on national level. The sliders
 highlight the educations that match the selected criteria, and are shown in the
@@ -337,7 +338,11 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
             [
                 html.Div(
                     [
-                        html.Div("Ledighed vs karakterer (valgte uddannelser)", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.H3("Unemployment, grades and salary", style={"fontWeight": "600", "marginBottom": "6px"}),
+                        html.Div("""The bubble chart highlights the selected
+educations from the treemap, to compare their unemployment rate and average
+grades (kvote 1). The size of the bubbles represents the salary of newly graduated
+students.""", style={"marginBottom": "6px", "marginTop": "10px", "fontStyle": "italic"}),
                         html.Div(id="bubble_legend", style={"marginBottom": "12px"}),
                         dcc.Graph(id="selection_bubble", style={"height": "460px"}, config=dict(displayModeBar=False)),
                         dcc.ConfirmDialog(id="bubble_confirm"),
@@ -347,9 +352,9 @@ likert variables. """, style={"marginBottom": "6px", "marginTop": "10px", "fontS
                     [
                         html.Div("See details for specific education", style={"fontWeight": "600", "marginBottom": "6px"}),
                         dcc.Dropdown(
-                            titles_options,
                             id="detail_select",
-                            placeholder="Vælg uddannelse",
+                            options=[],
+                            placeholder="Vælg en uddannelse fra dine valgte",
                             clearable=True,
                             style=dropdown_style,
                             className="dark-dropdown",
@@ -700,6 +705,21 @@ def update_parallel_plot(*args):
     figure_html = build_parallel_coordinates(data, selected_titles, slider_filter, chosen, color_map, theme, allowed_titles)
     legend = build_parcoord_legend(selected_titles, color_map, theme)
     return figure_html, slider_components, color_map, slider_filter, legend, legend
+
+
+# Keep `detail_select` options in sync with the chosen educations (edu1..edu6).
+@app.callback(
+    Output("detail_select", "options"),
+    Output("detail_select", "placeholder"),
+    selection_inputs,
+)
+def update_detail_select_options(*values):
+    # Only allow selecting among the currently chosen educations
+    chosen = [v for v in values if v]
+    if not chosen:
+        return [], "Vælg en uddannelse fra dine valgte"
+    opts = [{"label": t, "value": t} for t in chosen]
+    return opts, "Vælg uddannelse"
 
 
 
