@@ -7,7 +7,6 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Translate all UI to english (not the variables or data themselves)
 * Adjust sub categories (either new LLM or manually right now medicin is fx under byggeri/transport)
 * Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
-* Add all possible education location latitude and longitude to the script (right now it is only the major cities but it should be aligned with the filter for municipality)
 * The name for filer for municipality should probably also be changed since it is done on cities not municipalities
 * CHR values in the information box for "Detaljer for specifik uddannelse" needs to be changed since it just shows as one big string now
 
@@ -16,3 +15,4 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Add tooltip for the variables in parallel coordinates
 * Add gridlines/numbers to the parallel coordinates
 * Fix plotting issue where the bar charts for specific educations on the tree map stays in place even after it has reverted back to the overview
+* Add all possible education location latitude and longitude to the script (right now it is only the major cities but it should be aligned with the filter for municipality)

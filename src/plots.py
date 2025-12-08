@@ -335,6 +335,7 @@ def build_providers_map(providers_df: pd.DataFrame, theme: Theme | None = None) 
         zoom=6,
         height=520,
     )
+    fig.update_traces(marker=dict(size=14))  # make provider dots easier to see
 
     latitudes = providers_geo["inst_lat"].astype(float)
     longitudes = providers_geo["inst_lon"].astype(float)
