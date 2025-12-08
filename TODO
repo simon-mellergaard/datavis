@@ -1,7 +1,11 @@
 THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 
+* Change sliders in parallel coordinates, so that each the min and max is corresponding to the min and max of the variable (William)
+* Add borders in treemap in light mode. (Simon)
+* Modify background color in parallel coordinates (Simon).
+* Remove masters educations. (Jonas)
+* Add option to scale parallel coordinates to min and max.
 * Dropdown menu - filter ift hvilke uddannelser der er valgt
-* Double check colour blind safety (take a few SS and put into colour blind checker)
 * EVT extra: Order parallel coordinates in terms of correlation (to show differences clearly)
 * EVT extra: In the treemap, add additional information for "afbrud" and "tidsforbrug" with the parameter "customdata" to get more information for hover and text.
 * EVT extra: Further work needed with the barcharts along with adding additional information
@@ -23,3 +27,4 @@ THIS TODO LIST SHOULD BE PRIORITIZED WITH MOST IMPORTANT AT THE TOP
 * Fix drop down menu for (detaljer for specifik uddannelse) since in dark mode that is just white and impossible to read
 * String values in the information box for "Detaljer for specifik uddannelse" needs to be changed since it just shows as one big string now
 * Bubble add legend (the same as paracoord)
+* Double check colour blind safety (take a few SS and put into colour blind checker)
