@@ -184,18 +184,18 @@ def load_data(
     df["titel"] = df["titel"].astype(str).str.strip()
     df = _backfill_kandidat(df, df_raw)
 
-    df_prov = data[data["udbud_id"] != 999999].copy()
-    df_prov["titel"] = df_prov["titel"].astype(str).str.strip()
-    df_prov = df_prov.merge(mapping, on="titel", how="left")
-    df_prov["optagne_num"] = to_num(df_prov.get("optagne"))
-    df_prov["maanedloen_nyudd_n"] = to_num(df_prov.get("maanedloen_nyudd"))
-    df_prov["ledighed_nyudd_n"] = to_num(df_prov.get("ledighed_nyudd"))
-    df_prov["afbrud_num"] = to_num(df_prov.get("afbrud"))
-    df_prov["tidsforbrug_p50_num"] = to_num(df_prov.get("tidsforbrug_p50"))
+    df_prov_full = data[data["udbud_id"] != 999999].copy()
+    df_prov_full["titel"] = df_prov_full["titel"].astype(str).str.strip()
+    df_prov_full = df_prov_full.merge(mapping, on="titel", how="left")
+    df_prov_full["optagne_num"] = to_num(df_prov_full.get("optagne"))
+    df_prov_full["maanedloen_nyudd_n"] = to_num(df_prov_full.get("maanedloen_nyudd"))
+    df_prov_full["ledighed_nyudd_n"] = to_num(df_prov_full.get("ledighed_nyudd"))
+    df_prov_full["afbrud_num"] = to_num(df_prov_full.get("afbrud"))
+    df_prov_full["tidsforbrug_p50_num"] = to_num(df_prov_full.get("tidsforbrug_p50"))
 
-    # View without kandidat programmes (for visuals and dropdowns; dataset remains intact).
-    mask_non_kandidat = ~df_prov["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)
-    df_prov_no_kandidat = df_prov[mask_non_kandidat].copy()
+    # Visuals should exclude kandidat programmes; keep full data in df_raw.
+    mask_non_kandidat = ~df_prov_full["displaydocclass"].astype(str).str.contains("kandidat", case=False, na=False)
+    df_prov = df_prov_full[mask_non_kandidat].copy()
 
     excluded_cities = {
         "ballerup",
@@ -225,7 +225,7 @@ def load_data(
     size_options = [{"label": v[2], "value": k} for k, v in SIZE_METRICS.items()]
 
     available_titles = sorted(
-        df_prov_no_kandidat.dropna(subset=["educational_category", "cluster_label", "titel"])["titel"]
+        df_prov.dropna(subset=["educational_category", "cluster_label", "titel"])["titel"]
         .dropna()
         .astype(str)
         .unique()
