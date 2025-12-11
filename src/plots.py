@@ -1184,28 +1184,36 @@ def build_parcoord_sliders(
         label_tooltip = tooltips.get(col, "")
 
         # Small distribution preview above each slider
-        span = max_val - min_val
-        bin_count = max(5, min(40, int(np.ceil(span * 10)) if span > 0 else 5))
-        hist_vals, hist_edges = np.histogram(series, bins=bin_count, range=(min_val, max_val))
-        hist_x = (hist_edges[:-1] + hist_edges[1:]) / 2
+        # Force bins to line up with the 0.1 slider step so the bars align with handles.
+        bin_edges = np.arange(min_val, max_val + step * 0.5, step)
+        if len(bin_edges) < 2:
+            bin_edges = np.array([min_val, max_val])
+        bin_edges = np.round(bin_edges, 6)  # trim float noise
+        hist_vals, _ = np.histogram(series, bins=bin_edges)
+        bin_width = step
+        hist_x = bin_edges[:-1] + bin_width / 2
         hist_fig = go.Figure(
             go.Bar(
                 x=hist_x,
                 y=hist_vals,
+                width=bin_width,
                 marker=dict(
                     color="#94a3b8" if (theme or DEFAULT_THEME).name == "light" else "#6b7280",
                     line=dict(color="#e5e7eb" if (theme or DEFAULT_THEME).name == "light" else "#374151", width=0.6),
                 ),
             )
         )
+        # Keep bars tightly aligned with slider endpoints; extend axis by half a bin on each side
+        x_range = [bin_edges[0] - step * 0.5, bin_edges[-1] + step * 0.5]
+
         hist_fig.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
             height=80,
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(visible=False),
+            xaxis=dict(visible=False, range=x_range, fixedrange=True),
             yaxis=dict(visible=False),
-            bargap=0.02,
+            bargap=0.0,
         )
 
         components.append(
