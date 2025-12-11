@@ -328,8 +328,8 @@ likert variables.""", style={"marginBottom": "6px", "marginTop": "10px", "fontSt
                                 dcc.RadioItems(
                                     id="parcoord_scale_mode",
                                     options=[
-                                        {"label": "Fixed (2-5)", "value": "FIXED_SCALE"},
-                                        {"label": "Global min/max", "value": "DATA_SCALE"},
+                                        {"label": "Fix scale to global min/max", "value": "FIXED_SCALE"},
+                                        {"label": "Fix each scale to data min/max", "value": "DATA_SCALE"},
                                     ],
                                     value="FIXED_SCALE",
                                     labelStyle={"marginRight": "12px"},

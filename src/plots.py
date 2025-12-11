@@ -258,8 +258,8 @@ def build_detail_table(data: DataBundle, edu_title: str):
         series = frame[column].dropna().astype(str).str.strip()
         series = series[series != ""]
         return series.iloc[0] if not series.empty else None
-
-    rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
+    rows = []
+    # rows = [html.Tr([html.Th("Uddannelse"), html.Td(edu_title)])]
     for column, label, how, formatter in DETAIL_OVERVIEW_SPECS:
         value = metric_value(column, how)
         display = formatter(value) if value is not None else "N/A"
@@ -898,19 +898,39 @@ def build_parallel_coordinates(
     slider_filter = {k: tuple(v) for k, v in slider_filter.items() if k in columns}
 
     # --- AXIS RANGE CALCULATION ---
-    # Scale axes either to data min/max (DATA_SCALE) or fixed Likert range 2-5 (FIXED_SCALE).
+    # Compute global min/max across all selected variables for consistent scaling
     axis_ranges: Dict[str, Tuple[float, float]] = {}
     scaling_df = df.copy().dropna(subset=columns)
-    for col in columns:
-        if scale_mode == "FIXED_SCALE":
-            axis_ranges[col] = (2.0, 5.0)
-            continue
-        series = scaling_df[col].astype(float)
-        vmin = float(series.min())
-        vmax = float(series.max())
-        if np.isclose(vmin, vmax):
-            vmax = vmin + 0.1  # small pad so the axis has a span
-        axis_ranges[col] = (vmin, vmax)
+    
+    if scale_mode == "FIXED_SCALE":
+        # Find global min/max across all selected columns
+        all_values = []
+        for col in columns:
+            if col in scaling_df.columns:
+                series = scaling_df[col].astype(float)
+                all_values.extend(series.tolist())
+        
+        if all_values:
+            global_min = float(np.min(all_values))
+            global_max = float(np.max(all_values))
+            if np.isclose(global_min, global_max):
+                global_max = global_min + 0.1
+            # Use the same global range for all axes
+            for col in columns:
+                axis_ranges[col] = (global_min, global_max)
+        else:
+            # Fallback if no data
+            for col in columns:
+                axis_ranges[col] = (2.0, 5.0)
+    else:
+        # Dynamic scale: each axis gets its own min/max
+        for col in columns:
+            series = scaling_df[col].astype(float)
+            vmin = float(series.min())
+            vmax = float(series.max())
+            if np.isclose(vmin, vmax):
+                vmax = vmin + 0.1  # small pad so the axis has a span
+            axis_ranges[col] = (vmin, vmax)
     # -------------------------------------
 
     def normalize(value: float, bounds: Tuple[float, float]) -> float:
@@ -1400,15 +1420,15 @@ def build_selection_bubble(
         )
 
     # Ensure that 'Match' traces are rendered on top of background points.
-    try:
-        traces = list(fig.data)
-        match_traces = [t for t in traces if getattr(t, "name", "") == "Match"]
-        other_traces = [t for t in traces if getattr(t, "name", "") != "Match"]
-        # Reassign so non-match traces come first, match traces last (on top)
-        fig.data = tuple(other_traces + match_traces)
-    except Exception:
+    # try:
+    traces = list(fig.data)
+    match_traces = [t for t in traces if getattr(t, "name", "") == "Match"]
+    other_traces = [t for t in traces if getattr(t, "name", "") != "Match"]
+    # Reassign so non-match traces come first, match traces last (on top)
+    fig.data = tuple(other_traces + match_traces)
+    # except Exception:
         # If reordering fails for any reason, continue without raising.
-        pass
+        # pass
 
     fig.update_traces(cliponaxis=False)
     fig.update_layout(
