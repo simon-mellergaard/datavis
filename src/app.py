@@ -117,7 +117,7 @@ app.layout = html.Div(
 
         html.Div(
             [
-                html.H1("EduEx - Educational explorer dashboard", style={"marginBottom": "12px", "width": "100%"}),
+                html.H1("Edu-X – Educational Explorer Dashboard", style={"marginBottom": "12px", "width": "100%"}),
 
                 html.Div(
                     [
